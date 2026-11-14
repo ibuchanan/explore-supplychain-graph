@@ -1,0 +1,27 @@
+modules:
+  webtrigger:
+    - key: explore-supplychain-graph-webtrigger-sync
+      function: sync
+      urlFormat: v2
+      request:
+        authentication: none
+      response:
+        type: dynamic
+    - key: explore-supplychain-graph-webtrigger-async
+      function: async
+      urlFormat: v2
+      request:
+        authentication: none
+      response:
+        type: dynamic
+  function:
+    - key: sync
+      handler: index.runSync
+    - key: async
+      handler: index.runAsync
+app:
+  runtime:
+    name: nodejs24.x
+    memoryMB: 256
+    architecture: arm64
+  id: ari:cloud:ecosystem::app/dafd6b90-4561-4a15-960f-758ff81672cd
