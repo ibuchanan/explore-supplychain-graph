@@ -34,6 +34,6 @@ Describe the audience clearly when enabling sharing. Treat unrestricted access a
 
 ## Related
 
-- [Overall specification](../spec.md)
+- [Overall specification](../supplychain-graph.md)
 - [Workdown scope](../workdown.md)
 - [Domain glossary](../../GLOSSARY.md)
