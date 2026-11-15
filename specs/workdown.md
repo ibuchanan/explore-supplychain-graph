@@ -2,6 +2,11 @@
 
 Status: agreed scope only; not yet an implementable format specification.
 
+The [Workdown specification proposal](workdown-spec.md) builds on
+[Threaddown](threaddown.md). It proposes a reusable work-item format and a
+separate Explore Jira Epic profile. Its new field, child, and disclosure rules
+remain subject to review; this outline records the previously agreed scope.
+
 ## Problem Statement
 
 A cross-site share needs a curated, readable representation of Jira work that does not expose arbitrary source fields or require access to the source Jira site. The content convention needs its own definition rather than emerging accidentally from transport or indexing code.
@@ -59,4 +64,4 @@ Define Workdown as Markdown with Frontmatter designed for work items. Supplychai
 
 ## Further Notes
 
-Resolve the open decisions through a focused Workdown design session. Do not treat this outline as authorization to invent format details during implementation. The [overall Explore specification](spec.md) governs Exchange lifecycle, identity, sequencing, storage, and delivery.
+Resolve the open decisions through a focused Workdown design session. Do not treat this outline as authorization to invent format details during implementation. The [overall Explore specification](supplychain-graph.md) governs Exchange lifecycle, identity, sequencing, storage, and delivery.
