@@ -1,11 +1,11 @@
 # Workdown — Scope and Decision Outline
 
-Status: agreed scope only; not yet an implementable format specification.
+Status: agreed scope; see the approved [Workdown specification](workdown-spec.md) for the format.
 
-The [Workdown specification proposal](workdown-spec.md) builds on
-[Threaddown](threaddown.md). It proposes a reusable work-item format and a
-separate Explore Jira Epic profile. Its new field, child, and disclosure rules
-remain subject to review; this outline records the previously agreed scope.
+The [Workdown specification](workdown-spec.md) builds on
+[Threaddown](threaddown.md). It defines a reusable work-item format and a
+separate Explore Jira Epic profile, whose field, child, and disclosure rules
+were approved on 2026-11-15. This outline records the earlier agreed scope.
 
 ## Problem Statement
 

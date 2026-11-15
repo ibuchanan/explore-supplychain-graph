@@ -1,7 +1,10 @@
 # Workdown Specification
 
-Status: proposal for review. This draft does not approve new disclosure rules
-or authorize implementation of the Jira converter.
+Status: approved by Ian Buchanan on 2026-11-15, including the format and the
+Explore Jira Epic profile's disclosure rules. Approval does not satisfy the
+[implementation gates](#event-and-ingestion-implementation-gates) or settle
+the numeric limits, which must be resolved before the converter ships; see the
+[disclosure decision](adr/0002-workdown-disclosure-boundary.md).
 
 ## Purpose
 
@@ -19,7 +22,7 @@ tooling, but Workdown does not define a Git-resident work-item store, authoring
 workflow, or tracker synchronization.
 
 The format is independent of transport, indexing, and sharing policy. The
-[Explore profile](#proposed-explore-jira-epic-profile) below proposes the narrower
+[Explore profile](#explore-jira-epic-profile) below defines the narrower
 content rules for this app. The [parent specification](supplychain-graph.md) continues to
 govern Exchanges, document identity, sequencing, and Publications.
 
@@ -142,7 +145,7 @@ round-trip, and discloses only an allowlist (see the Explore profile). Its
 
 ## Document structure
 
-The terms MUST, SHOULD, and MAY describe requirements of this proposed version.
+The terms MUST, SHOULD, and MAY describe requirements of this version.
 
 A document MUST be UTF-8 Markdown with one YAML Frontmatter mapping, followed by
 one H1 title and a required `## Description` section. An optional
@@ -352,10 +355,11 @@ It MUST NOT contain child descriptions, comments, or fields absent from child
 records. An empty child list omits the section. Whether children were queried
 and which ones qualify is a profile decision, not a format-level assumption.
 
-## Proposed Explore Jira Epic profile
+## Explore Jira Epic profile
 
-The following are proposed answers to the [scope outline](workdown.md), not
-previously agreed decisions. They MUST be reviewed before converter work begins.
+The following are the approved answers to the [scope outline](workdown.md).
+Changing the allowlist, child rule, or eligibility rule requires a new review
+and an update to the [disclosure decision](adr/0002-workdown-disclosure-boundary.md).
 
 ### Disclosure allowlist
 
@@ -392,7 +396,7 @@ secret redaction. Source administrators must understand that boundary.
 
 ### Child inclusion and permission boundary
 
-Proposed rule: include all direct children returned through the current Jira
+Rule: include all direct children returned through the current Jira
 parent relationship, including completed children; no recursion, subtasks of
 children, linked issues, or legacy Epic Link fallback unless separately approved.
 Resolve the supported relationship per project type before implementation.
@@ -454,7 +458,7 @@ Before implementing this profile, verify and document event coverage for:
    principal changes. Do not claim these always produce usable Jira events.
 4. Source-Epic deletion, which remains explicitly unsupported by the parent spec.
 
-If required events or prior-parent data are unavailable, revise the proposed
+If required events or prior-parent data are unavailable, revise the
 profile or explicitly approve the freshness limitation; do not silently add
 polling or promise reconciliation. Event delivery does not guarantee a
 transactionally consistent multi-issue Jira snapshot.
