@@ -1,4 +1,5 @@
 import { expect, it } from "vitest";
+import { parse } from "yaml";
 import contract from "../src/openrpc.json";
 import { validateWorkdown } from "../src/workdown-validation";
 import { validateOpenRpc } from "./openrpc";
@@ -48,4 +49,33 @@ it("authenticates discovery and exports a real Epic through the deployed Forge w
   const result = (await response.json()) as { result?: unknown };
   // Boolean assertions avoid printing customer documents or credentials on failure.
   expect(validateWorkdown(result.result)).toBe(true);
+  const metadata = parse(
+    (result.result as string).split("---\n")[1] ?? "",
+  ) as Record<string, unknown>;
+  expect(Object.hasOwn(metadata, "key")).toBe(true);
+  const allowed = new Set([
+    "format",
+    "format_version",
+    "type",
+    "source_id",
+    "title",
+    "resource",
+    "work_type",
+    "key",
+    "work_status",
+    "resolution",
+    "priority",
+    "tags",
+    "created_at",
+    "updated_at",
+    "start_date",
+    "due_date",
+    "generated",
+    "sources",
+  ]);
+  expect(Object.keys(metadata).every((key) => allowed.has(key))).toBe(true);
+  // Opt in when testing an Epic deliberately configured with Start date.
+  const expectedStart = process.env["WORKDOWN_TEST_EXPECTED_START_DATE"];
+  if (expectedStart)
+    expect(metadata["start_date"] === expectedStart).toBe(true);
 }, 65_000);

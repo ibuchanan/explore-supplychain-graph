@@ -5,7 +5,7 @@
     {
       "name": "workdown.export",
       "summary": "Export a Jira issue as the Workdown document an Exchange would share",
-      "description": "Read-only. Reads one issue as the caller, checks it against the named profile, and returns its Workdown document. Never stores or publishes anything. The caller must be able to read the issue. An issue that does not exist and one the caller cannot read produce the same forbidden error. An issue that does not satisfy the profile produces profile-mismatch.",
+      "description": "Read-only. Reads one issue as the caller, checks it against the named profile, and returns its Workdown document. Never stores or publishes anything. The document contains only the profile's allowlisted fields; nothing else on the issue is ever included. An optional field that is empty or not configured is omitted. Start date is found by its stable semantic identity, never by display name or a fixed field ID, so equivalent issues on different sites produce the same document. The caller must be able to read the issue. An issue that does not exist and one the caller cannot read produce the same forbidden error. An issue that does not satisfy the profile produces profile-mismatch. A field that cannot be resolved to exactly one supported field produces field-unresolved. A field or value that cannot be read produces field-unreadable. A failed export never returns a partial document.",
       "paramStructure": "by-name",
       "params": [
         {

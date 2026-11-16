@@ -14,24 +14,34 @@ const epic = {
     issuetype: { name: "Epic", hierarchyLevel: 1 },
     updated: "2026-11-15T10:30:00.000Z",
     description: null as unknown,
+    project: { id: "10000" },
+    status: null as unknown,
+    resolution: null as unknown,
+    priority: null as unknown,
+    labels: [] as string[],
+    created: null as string | null,
+    duedate: null as string | null,
   },
 };
 afterEach(() => vi.unstubAllGlobals());
 
 async function call(
-  issue = epic,
+  issue: typeof epic & { fields: Record<string, unknown> } = epic,
   params: unknown = { profile: "jira-epic", issue: "DEMO-42" },
   status = 200,
+  catalog: unknown[] = [],
+  site = cloudId,
+  override?: (url: URL) => Response | undefined,
 ) {
   vi.stubGlobal("fetch", async (url: string, options: RequestInit) => {
     expect(options.headers).toMatchObject({
       Authorization: "Basic dGVzdDpmYWtl",
     });
     expect(
-      url.startsWith(
-        `https://api.atlassian.com/ex/jira/${cloudId}/rest/api/3/`,
-      ),
+      url.startsWith(`https://api.atlassian.com/ex/jira/${site}/rest/api/3/`),
     ).toBe(true);
+    const overridden = override?.(new URL(url));
+    if (overridden) return overridden;
     if (url.endsWith("/myself"))
       return Response.json({
         accountId: "reader",
@@ -42,6 +52,18 @@ async function call(
       return Response.json({
         permissions: { ADMINISTER: { havePermission: true } },
       });
+    if (url.includes("/field/search?")) {
+      const query = new URL(url).searchParams;
+      expect(query.get("expand")).toBe("stableId");
+      const startAt = Number(query.get("startAt"));
+      return Response.json({
+        startAt,
+        maxResults: 1,
+        total: catalog.length,
+        isLast: startAt + 1 >= catalog.length,
+        values: catalog.slice(startAt, startAt + 1),
+      });
+    }
     if (url.includes("/issue/")) return Response.json(issue, { status });
     if (url.endsWith("/serverInfo"))
       return Response.json({ baseUrl: "https://source.example.com" });
@@ -61,13 +83,321 @@ async function call(
         params,
       }),
     },
-    { installContext: `ari:cloud:jira::site/${cloudId}` },
+    { installContext: `ari:cloud:jira::site/${site}` },
   );
   expect(response.statusCode).toBe(200);
   return JSON.parse(response.body);
 }
 
+const startField = {
+  id: "customfield_20017",
+  name: "Start date",
+  stableId: "sfid:jira-software:start-date",
+  schema: {
+    type: "date",
+    custom: "com.atlassian.jira.plugin.system.customfieldtypes:datepicker",
+  },
+};
+
 describe("workdown.export", () => {
+  it("omits readable empty optional name values", async () => {
+    const response = await call({
+      ...epic,
+      fields: {
+        ...epic.fields,
+        priority: { name: "" },
+        resolution: { name: "   " },
+      },
+    });
+    expect(response.result).toBeTypeOf("string");
+    expect(response.result).not.toContain("priority:");
+    expect(response.result).not.toContain("resolution:");
+  });
+  it("does not infer absence from an empty stable-ID discriminator", async () => {
+    const response = await call(epic, undefined, 200, [
+      { ...startField, stableId: "" },
+    ]);
+    expect(response.error.code).toBe(-32004);
+  });
+  it("emits byte-equivalent content for portable fixtures with different local field IDs", async () => {
+    const a = JSON.parse(
+      readFileSync(
+        new URL(
+          "./fixtures/workdown-export/start-date-site-a.json",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+    );
+    const b = JSON.parse(
+      readFileSync(
+        new URL(
+          "./fixtures/workdown-export/start-date-site-b.json",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+    );
+    const first = await call(
+      { ...epic, fields: { ...epic.fields, ...a.fields } },
+      undefined,
+      200,
+      a.catalog,
+    );
+    const second = await call(
+      { ...epic, fields: { ...epic.fields, ...b.fields } },
+      undefined,
+      200,
+      b.catalog,
+    );
+    expect(first.result).toBeTypeOf("string");
+    expect(first.result).toBe(second.result);
+  });
+  it.each([
+    [[startField, { ...startField, id: "customfield_20018" }], -32003],
+    [[{ ...startField, schema: { type: "string" } }], -32003],
+    [[{ ...startField, stableId: undefined }], -32004],
+  ])(
+    "fails whole export for ambiguous, incompatible, or incomplete catalogs",
+    async (fields, code) => {
+      expect(
+        (await call(epic, undefined, 200, fields as unknown[])).error.code,
+      ).toBe(code);
+    },
+  );
+  it.each([403, 429, 500])(
+    "fails unreadable catalog requests (%s) without fallback",
+    async (status) => {
+      expect(
+        (
+          await call(epic, undefined, 200, [], cloudId, (url) =>
+            url.pathname.endsWith("/field/search")
+              ? Response.json({}, { status })
+              : undefined,
+          )
+        ).error.code,
+      ).toBe(-32004);
+    },
+  );
+  it.each([
+    { startAt: 0, total: 2, isLast: true, values: [startField] },
+    { startAt: 1, total: 0, isLast: true, values: [] },
+    { startAt: 0, total: 2, isLast: false, values: [] },
+  ])("rejects inconsistent or incomplete catalog pagination", async (page) => {
+    expect(
+      (
+        await call(epic, undefined, 200, [], cloudId, (url) =>
+          url.pathname.endsWith("/field/search")
+            ? Response.json(page)
+            : undefined,
+        )
+      ).error.code,
+    ).toBe(-32004);
+  });
+  it.each([null, ""])("omits a readable unset Start date %j", async (value) => {
+    const response = await call(
+      { ...epic, fields: { ...epic.fields, [startField.id]: value } },
+      undefined,
+      200,
+      [startField],
+    );
+    expect(response.result).toBeTypeOf("string");
+    expect(response.result).not.toContain("start_date:");
+  });
+  it("omits Start date when the complete catalog has no semantic match", async () => {
+    const response = await call(epic, undefined, 200, [
+      { ...startField, stableId: "sfid:other" },
+    ]);
+    expect(response.result).toBeTypeOf("string");
+    expect(response.result).not.toContain("start_date:");
+  });
+  it("omits a field proven inapplicable by the complete project-filtered catalog", async () => {
+    const response = await call(
+      epic,
+      undefined,
+      200,
+      [startField],
+      cloudId,
+      (url) =>
+        url.searchParams.has("projectIds")
+          ? Response.json({ startAt: 0, total: 0, isLast: true, values: [] })
+          : undefined,
+    );
+    expect(response.result).toBeTypeOf("string");
+    expect(response.result).not.toContain("start_date:");
+  });
+  it("does not treat a missing requested Start date value as unset", async () => {
+    expect((await call(epic, undefined, 200, [startField])).error.code).toBe(
+      -32004,
+    );
+  });
+  it.each([403, 404, 500])(
+    "fails a separately unreadable Start date value (%s)",
+    async (status) => {
+      const response = await call(
+        epic,
+        undefined,
+        200,
+        [startField],
+        cloudId,
+        (url) =>
+          url.searchParams.get("fields") === startField.id
+            ? Response.json({}, { status })
+            : undefined,
+      );
+      expect(response.error.code).toBe(-32004);
+    },
+  );
+  it("preserves source identity across key changes but not site changes", async () => {
+    const { parse } = await import("yaml");
+    const metadata = (text: string) => parse(text.split("---\n")[1] ?? "");
+    const original = metadata((await call()).result);
+    const moved = metadata((await call({ ...epic, key: "MOVED-9" })).result);
+    const other = metadata(
+      (
+        await call(
+          epic,
+          undefined,
+          200,
+          [],
+          "00000000-0000-4000-8000-000000000002",
+        )
+      ).result,
+    );
+    expect(moved.source_id).toBe(original.source_id);
+    expect(moved.resource).not.toBe(original.resource);
+    expect(other.source_id).not.toBe(original.source_id);
+  });
+  it.each([
+    { summary: "Changed" },
+    { updated: "2026-11-16T10:30:00.000Z" },
+    { labels: ["new"] },
+  ])("changes bytes for a supported field change %j", async (change) => {
+    expect(
+      (await call({ ...epic, fields: { ...epic.fields, ...change } })).result,
+    ).not.toBe((await call()).result);
+  });
+  it("does not treat a conflicting project catalog as proof of field absence", async () => {
+    const response = await call(
+      epic,
+      undefined,
+      200,
+      [startField],
+      cloudId,
+      (url) =>
+        url.searchParams.has("projectIds")
+          ? Response.json({
+              startAt: 0,
+              total: 1,
+              isLast: true,
+              values: [{ ...startField, schema: { type: "string" } }],
+            })
+          : undefined,
+    );
+    expect(response.error).toEqual({
+      code: -32003,
+      message: "Field unresolved",
+    });
+  });
+  it("reports invalid Start date values as field-unreadable", async () => {
+    const response = await call(
+      { ...epic, fields: { ...epic.fields, [startField.id]: "2026-02-30" } },
+      undefined,
+      200,
+      [startField],
+    );
+    expect(response.error).toEqual({
+      code: -32004,
+      message: "Field unreadable",
+    });
+  });
+  it.each([
+    { priority: {} },
+    { labels: ["ok", 4] },
+    { created: "2026-02-30T10:30:00.000Z" },
+  ])(
+    "fails for malformed scalar values without returning partial content: %j",
+    async (extra) => {
+      const response = await call({
+        ...epic,
+        fields: { ...epic.fields, ...extra },
+      } as typeof epic);
+      expect(response.error).toEqual({
+        code: -32004,
+        message: "Field unreadable",
+      });
+    },
+  );
+  it("fails rather than silently omitting a requested unreadable scalar field", async () => {
+    const response = await call(epic, undefined, 200, [], cloudId, (url) =>
+      url.pathname.includes("/issue/")
+        ? Response.json({
+            ...epic,
+            fields: { ...epic.fields, labels: undefined },
+          })
+        : undefined,
+    );
+    expect(response.error).toEqual({
+      code: -32004,
+      message: "Field unreadable",
+    });
+  });
+  it("resolves Start date on later catalog pages by stable identity, not name or numeric ID", async () => {
+    const id = "customfield_20017";
+    const response = await call(
+      { ...epic, fields: { ...epic.fields, [id]: "2026-11-20" } },
+      undefined,
+      200,
+      [
+        {
+          id: "customfield_999",
+          name: "Start date",
+          stableId: "sfid:unrelated",
+          schema: { type: "date" },
+        },
+        {
+          id,
+          name: "Localized planned start",
+          stableId: "sfid:jira-software:start-date",
+          schema: {
+            type: "date",
+            custom:
+              "com.atlassian.jira.plugin.system.customfieldtypes:datepicker",
+          },
+        },
+      ],
+    );
+    expect(response.result).toContain('start_date: "2026-11-20"\n');
+    expect(response.result).not.toContain(id);
+  });
+  it("emits only the scalar disclosure allowlist with canonical values", async () => {
+    const response = await call({
+      ...epic,
+      fields: {
+        ...epic.fields,
+        status: {
+          name: "Building",
+          statusCategory: { key: "indeterminate", name: "In progress" },
+        },
+        resolution: { name: "Fixed" },
+        priority: { name: "High" },
+        labels: ["zebra", "alpha", "alpha"],
+        created: "2026-11-01T12:00:00.000+0100",
+        duedate: "2026-12-01",
+        assignee: { displayName: "PRIVATE-PERSON" },
+        comments: ["PRIVATE-COMMENT"],
+        customfield_666: "PRIVATE-CUSTOM",
+      },
+    });
+    expect(response.result).toContain(
+      'work_status:\n  name: "Building"\n  category: "in_progress"\nresolution: "Fixed"\npriority: "High"\ntags:\n  - "alpha"\n  - "zebra"\ncreated_at: "2026-11-01T11:00:00.000Z"\n',
+    );
+    expect(response.result).toContain('due_date: "2026-12-01"\n');
+    expect(response.result).not.toContain("PRIVATE");
+  });
+  it("includes the current issue key in the disclosed metadata", async () => {
+    expect((await call()).result).toContain('key: "DEMO-42"\n');
+  });
   it.each(["2026-02-30T10:30:00.000Z", "not-a-date"])(
     "rejects invalid source timestamp %s",
     async (updated) => {
@@ -110,7 +440,13 @@ describe("workdown.export", () => {
   });
   it("returns identical bytes with reordered fields and labels", async () => {
     const a = { ...epic, fields: { ...epic.fields, labels: ["b", "a"] } };
-    const b = { ...epic, fields: { labels: ["a", "b"], ...epic.fields } };
+    const b = {
+      ...epic,
+      fields: {
+        ...Object.fromEntries(Object.entries(epic.fields).reverse()),
+        labels: ["a", "b"],
+      },
+    } as typeof epic;
     expect(await call(a)).toEqual(await call(b));
     expect(await call(a)).toEqual(await call(a));
   });

@@ -1,0 +1,14 @@
+{
+  "catalog": [
+    {
+      "id": "customfield_20731",
+      "name": "Localized start B",
+      "stableId": "sfid:jira-software:start-date",
+      "schema": {
+        "type": "date",
+        "custom": "com.atlassian.jira.plugin.system.customfieldtypes:datepicker"
+      }
+    }
+  ],
+  "fields": { "customfield_20731": "2026-11-20" }
+}

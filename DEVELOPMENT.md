@@ -111,8 +111,24 @@ is no longer anonymous. The application contract is unchanged.
 - `workdown.export` reads the issue and canonical site URL with the caller's
   credential, emits the two core golden documents, and validates Frontmatter
   against `src/workdown-frontmatter.schema.json` plus safe YAML and identity
-  invariants. Rich ADF fails closed until ticket 07; optional export fields,
-  eligibility, and children remain tickets 04–06. No data is stored or published.
+  invariants. Ticket 04 adds the scalar disclosure allowlist and semantic Start
+  date resolution; its two-site/project-type cloud verification is pending.
+  Rich ADF fails closed until ticket 07; eligibility and children remain tickets
+  05–06. No data is stored or published.
+- Start date discovery paginates `field/search?expand=stableId`, checks the
+  complete project-filtered catalog, and reads only the resolved local field ID.
+  All reads use the caller's token. A complete authoritative zero-match catalog
+  or readable empty value omits `start_date`. Incomplete/unreadable metadata or
+  requested values fail with `field-unreadable` (-32004); ambiguous/incompatible
+  mappings fail with `field-unresolved` (-32003), without returning field names.
+  No extra OAuth scopes or egress destinations are declared. Catalog work is
+  bounded to 1000 pages per enumeration and fails rather than returning partial
+  results. This local implementation does not prove team-managed coverage; see
+  the ticket 04 evidence section of `specs/workdown-jira.md`.
+- The deployed test can assert a known Start date via the local optional
+  `WORKDOWN_TEST_EXPECTED_START_DATE` environment variable. Run it separately
+  with each approved site's configured inputs and a known populated Epic;
+  ticket 04 requires two sites with different field IDs and both project types.
 - Every request, including discovery, needs `Authorization: Basic BASE64`, where
   BASE64 encodes `email:api-token`. Use a scoped Jira API token with access to
   the identity, permissions, issue, and server-info reads below. The exact

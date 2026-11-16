@@ -6,6 +6,7 @@ source_id: "ari:cloud:jira:00000000-0000-4000-8000-000000000001:issue/10042"
 title: "Publish partner availability"
 resource: "https://source.example.com/browse/DEMO-42"
 work_type: "Epic"
+key: "DEMO-42"
 updated_at: "2026-11-15T10:30:00.000Z"
 generated:
   by: "workdown/1"

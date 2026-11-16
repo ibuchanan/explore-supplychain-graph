@@ -1,6 +1,7 @@
 import { err, ok } from "@forge-ahead/errors";
 import type { HandlerMap } from "./generated/contract";
 import { type CommandContext, jiraGet } from "./jira";
+import { resolveStartDate } from "./start-date";
 
 const quote = JSON.stringify;
 const escapeMarkdown = (text: string) =>
@@ -47,8 +48,83 @@ type Epic = {
     updated: string;
     issuetype: { name: string; hierarchyLevel: number };
     description: unknown;
+    status?: { name: string; statusCategory?: { key: string } } | null;
+    resolution?: { name: string } | null;
+    priority?: { name: string } | null;
+    labels?: string[] | null;
+    created?: string | null;
+    duedate?: string | null;
+    [key: string]: unknown;
   };
 };
+
+function validScalars(fields: Epic["fields"]): boolean {
+  const name = (value: unknown) => typeof value === "string" && !!value.trim();
+  for (const key of ["status", "resolution", "priority"] as const) {
+    const value = fields[key];
+    if (
+      value !== null &&
+      (!value || typeof value !== "object" || typeof value.name !== "string")
+    )
+      return false;
+  }
+  if (fields.status?.statusCategory && !name(fields.status.statusCategory.key))
+    return false;
+  if (
+    fields.labels !== null &&
+    (!Array.isArray(fields.labels) || !fields.labels.every(name))
+  )
+    return false;
+  for (const key of ["created", "duedate"] as const) {
+    const value = fields[key];
+    if (value === null || value === "") continue;
+    if (typeof value !== "string" || !Number.isFinite(Date.parse(value)))
+      return false;
+    const day = value.slice(0, 10);
+    if (
+      !/^\d{4}-\d{2}-\d{2}$/.test(day) ||
+      new Date(day).toISOString().slice(0, 10) !== day ||
+      (key === "duedate" && value !== day)
+    )
+      return false;
+    if (
+      key === "created" &&
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}(Z|[+-]\d{2}:?\d{2})$/.test(
+        value,
+      )
+    )
+      return false;
+  }
+  return true;
+}
+
+function scalarFields(fields: Epic["fields"]): string[] {
+  const result: string[] = [];
+  if (fields.status?.name.trim()) {
+    result.push("work_status:", `  name: ${quote(fields.status.name)}`);
+    const category = (
+      { new: "todo", indeterminate: "in_progress", done: "done" } as Record<
+        string,
+        string
+      >
+    )[fields.status.statusCategory?.key ?? ""];
+    if (category) result.push(`  category: ${quote(category)}`);
+  }
+  for (const key of ["resolution", "priority"] as const) {
+    if (fields[key]?.name.trim())
+      result.push(`${key}: ${quote(fields[key].name)}`);
+  }
+  if (fields.labels?.length)
+    result.push(
+      "tags:",
+      ...[...new Set(fields.labels)]
+        .sort()
+        .map((label) => `  - ${quote(label)}`),
+    );
+  if (fields.created)
+    result.push(`created_at: ${quote(new Date(fields.created).toISOString())}`);
+  return result;
+}
 
 export const exportWorkdown: HandlerMap<
   CommandContext,
@@ -59,13 +135,59 @@ export const exportWorkdown: HandlerMap<
   const response = await jiraGet(
     installation,
     principal.authorization,
-    `issue/${encodeURIComponent(params.issue)}?fields=summary,issuetype,updated,description`,
+    `issue/${encodeURIComponent(params.issue)}?fields=summary,issuetype,updated,description,status,resolution,priority,labels,created,duedate,project`,
   );
   if ([401, 403, 404].includes(response.status)) return err("forbidden");
   if (!response.ok) return err("internal-error");
   const issue = (await response.json()) as Epic;
   if (issue.fields.issuetype.hierarchyLevel !== 1)
     return err("profile-mismatch");
+  if (
+    [
+      "status",
+      "resolution",
+      "priority",
+      "labels",
+      "created",
+      "duedate",
+      "project",
+    ].some((key) => !Object.hasOwn(issue.fields, key))
+  )
+    return err("field-unreadable");
+  if (!validScalars(issue.fields)) return err("field-unreadable");
+  const mapping = await resolveStartDate(
+    context,
+    (issue.fields["project"] as { id?: unknown } | undefined)?.id,
+  );
+  if (mapping.error) return err(mapping.error);
+  let startDate: unknown;
+  if (mapping.id) {
+    try {
+      const valueResponse = await jiraGet(
+        installation,
+        principal.authorization,
+        `issue/${encodeURIComponent(issue.id)}?fields=${mapping.id}`,
+      );
+      if (!valueResponse.ok) return err("field-unreadable");
+      const value = (await valueResponse.json()) as {
+        fields?: Record<string, unknown>;
+      };
+      if (!value.fields || !Object.hasOwn(value.fields, mapping.id))
+        return err("field-unreadable");
+      startDate = value.fields[mapping.id];
+      if (
+        startDate !== null &&
+        startDate !== "" &&
+        (typeof startDate !== "string" ||
+          !/^\d{4}-\d{2}-\d{2}$/.test(startDate) ||
+          !Number.isFinite(Date.parse(startDate)) ||
+          new Date(startDate).toISOString().slice(0, 10) !== startDate)
+      )
+        return err("field-unreadable");
+    } catch {
+      return err("field-unreadable");
+    }
+  }
   const server = await jiraGet(
     installation,
     principal.authorization,
@@ -98,7 +220,13 @@ export const exportWorkdown: HandlerMap<
     `title: ${quote(title)}`,
     `resource: ${quote(resource)}`,
     `work_type: ${quote(issue.fields.issuetype.name)}`,
+    `key: ${quote(issue.key)}`,
+    ...scalarFields(issue.fields),
     `updated_at: ${quote(updated)}`,
+    ...(startDate ? [`start_date: ${quote(startDate)}`] : []),
+    ...(issue.fields.duedate
+      ? [`due_date: ${quote(issue.fields.duedate)}`]
+      : []),
     "generated:",
     '  by: "workdown/1"',
     "sources:",

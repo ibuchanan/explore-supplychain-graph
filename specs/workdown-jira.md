@@ -241,6 +241,42 @@ estimates, and all other fields not explicitly listed. Text already embedded
 in an allowed description is still disclosed; a field allowlist is not PII or
 secret redaction. Source administrators must understand that boundary.
 
+### Ticket 04 implementation evidence (2026-11-16)
+
+Local Command tests use caller-token HTTP fakes, including full catalog
+pagination with `expand=stableId`, a second project-filtered catalog, and a
+separate issue read requesting only the resolved site-local Start date ID.
+All catalog and issue calls use the authenticated caller's credential, never
+app-level access. Catalog errors, missing stable-ID metadata, inconsistent
+pagination, and missing requested values fail with `field-unreadable`;
+ambiguous or incompatible mappings fail with `field-unresolved`.
+
+Ian Buchanan approved omission of `start_date` for zero matches in a complete
+authoritative catalog on 2026-11-16. A resolved empty value is also omitted.
+No display-name or numeric-ID fallback exists. The current development gate
+requires Jira ADMINISTER; non-admin project-sharing behavior is not verified.
+Synthetic fixture files with different custom IDs produce identical bytes when
+site/issue identity and all semantic data are held constant. Actual different
+sites intentionally produce different `source_id` values.
+
+**Cloud evidence pending:** No ticket 04 deployment, installation upgrade,
+two-site run, or company-managed/team-managed coverage has occurred. The
+project-filtered field-search response is treated as authoritative only under
+the current Jira-admin development gate; this remains a runtime verification
+hypothesis, not proof of visibility completeness for general sharing callers.
+The endpoint documents classic-project coverage; if a team-managed run omits a
+configured field or otherwise contradicts this mapping, stop and revise the
+profile rather than introduce a name-based fallback. A syntactically complete
+response alone does not establish universal project-type coverage.
+
+The deployed test now checks that export metadata stays within the allowlist.
+For each approved site/project run, choose an Epic with a known configured Start
+date and provide `WORKDOWN_TEST_EXPECTED_START_DATE` in the local environment to
+assert its exact value without printing the document. Run the existing deployed
+test separately for both site URLs/credentials; collect sanitized evidence of
+different field IDs and both project types before marking ticket 04 done.
+This optional assertion variable is not a Forge runtime secret or manifest input.
+
 ### Extension fields
 
 The Jira profile adopts no extension fields in this draft. Candidates

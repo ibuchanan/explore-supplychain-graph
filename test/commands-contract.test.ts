@@ -36,30 +36,37 @@ describe("application Command contract", () => {
 });
 
 describe("application error catalog", () => {
-  it("maps profile-mismatch to its public JSON-RPC error", async () => {
-    const dispatch = createDispatcher<undefined>({
-      handlers: { "workdown.export": async () => err("profile-mismatch") },
-      errorCatalog: commandErrors,
-      inputValidators: { "workdown.export": () => true },
-      outputValidators: { "workdown.export": () => true },
-    });
+  it.each([
+    ["profile-mismatch", -32002, "Profile mismatch"],
+    ["field-unresolved", -32003, "Field unresolved"],
+    ["field-unreadable", -32004, "Field unreadable"],
+  ] as const)(
+    "maps %s to its public JSON-RPC error",
+    async (name, code, message) => {
+      const dispatch = createDispatcher<undefined>({
+        handlers: { "workdown.export": async () => err(name) },
+        errorCatalog: commandErrors,
+        inputValidators: { "workdown.export": () => true },
+        outputValidators: { "workdown.export": () => true },
+      });
 
-    await expect(
-      dispatch(
-        {
-          jsonrpc: "2.0",
-          id: 1,
-          method: "workdown.export",
-          params: { profile: "jira-epic", issue: "DEMO-1" },
-        },
-        undefined,
-      ),
-    ).resolves.toEqual({
-      jsonrpc: "2.0",
-      id: 1,
-      error: { code: -32002, message: "Profile mismatch" },
-    });
-  });
+      await expect(
+        dispatch(
+          {
+            jsonrpc: "2.0",
+            id: 1,
+            method: "workdown.export",
+            params: { profile: "jira-epic", issue: "DEMO-1" },
+          },
+          undefined,
+        ),
+      ).resolves.toEqual({
+        jsonrpc: "2.0",
+        id: 1,
+        error: { code, message },
+      });
+    },
+  );
 });
 
 describe("workdown.export golden fixtures", () => {
