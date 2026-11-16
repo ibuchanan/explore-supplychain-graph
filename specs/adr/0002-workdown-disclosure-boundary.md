@@ -2,11 +2,12 @@
 
 ## Context
 
-Explore shares curated Jira Epic context across sites. [ADR 0001](0001-unrestricted-destination-visibility.md) makes shared content unrestricted at the destination, so the Workdown content rules are the only control over what leaves the source site. The [Workdown specification](../workdown-spec.md) defines a generic work-item format and a separate Explore Jira Epic profile.
+Explore shares curated Jira Epic context across sites. [ADR 0001](0001-unrestricted-destination-visibility.md) makes shared content unrestricted at the destination, so the Workdown content rules are the only control over what leaves the source site. The [Workdown specification](../workdown-spec.md) defines the generic work-item format; the [Jira companion](../workdown-jira.md) defines the Explore Jira Epic profile.
 
 ## Decision
 
-Approve the Explore Jira Epic profile in the Workdown specification as the disclosure boundary, including:
+Approve the Explore Jira Epic profile as documented in [workdown-jira.md](../workdown-jira.md)
+as the disclosure boundary, including:
 
 - an explicit allowlist of fields; everything not listed is excluded, with no passthrough and no wildcard extension;
 - direct children only, completed children included, no recursion, issue links, or legacy Epic Link fallback;
@@ -26,13 +27,14 @@ The field allowlist is not PII or secret redaction. Text inside an allowed descr
 ## Consequences
 
 - Source Project Admins must understand that the description is shared verbatim.
-- Changing the allowlist, child rule, or eligibility rule requires a new review and an update to this ADR.
+- Changing the allowlist, child rule, or eligibility rule requires a new review and an update to this ADR and [workdown-jira.md](../workdown-jira.md).
 - Source permission changes and missed events can leave stale content at the destination; withdrawal and freshness limits remain as in the overall specification.
-- Approval does not satisfy the event and ingestion implementation gates or fix the byte and child-count limits.
+- Approval of the disclosure boundary does not satisfy the event and ingestion implementation gates, resolve field-mapping ambiguities, or fix the byte and child-count numeric limits.
 
 ## Related
 
 - [Workdown specification](../workdown-spec.md)
+- [Workdown Jira profile and research](../workdown-jira.md)
 - [Workdown scope](../workdown.md)
 - [ADR 0001](0001-unrestricted-destination-visibility.md)
 - [Overall specification](../supplychain-graph.md)

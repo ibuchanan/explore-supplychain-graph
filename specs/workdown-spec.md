@@ -1,10 +1,8 @@
 # Workdown Specification
 
-Status: approved by Ian Buchanan on 2026-11-15, including the format and the
-Explore Jira Epic profile's disclosure rules. Approval does not satisfy the
-[implementation gates](#event-and-ingestion-implementation-gates) or settle
-the numeric limits, which must be resolved before the converter ships; see the
-[disclosure decision](adr/0002-workdown-disclosure-boundary.md).
+Status: format approved by Ian Buchanan on 2026-11-15. Source-profile approval
+and implementation readiness are documented separately; see
+[Source profiles](#source-profiles).
 
 ## Purpose
 
@@ -21,10 +19,10 @@ Plain Markdown with Frontmatter keeps documents diffable and friendly to Git
 tooling, but Workdown does not define a Git-resident work-item store, authoring
 workflow, or tracker synchronization.
 
-The format is independent of transport, indexing, and sharing policy. The
-[Explore profile](#explore-jira-epic-profile) below defines the narrower
-content rules for this app. The [parent specification](supplychain-graph.md) continues to
-govern Exchanges, document identity, sequencing, and Publications.
+The format is independent of transport, indexing, and sharing policy.
+Platform-specific profiles define narrower content rules; see [Source profiles](#source-profiles).
+The [parent specification](supplychain-graph.md) continues to govern Exchanges,
+document identity, sequencing, and Publications.
 
 ## Relationship to Threaddown
 
@@ -258,26 +256,18 @@ sprint name, out of the core while letting a profile carry it.
 - **Versioning.** Adopting an extension field in a profile does not change
   `format_version`. A core change does.
 
-The Explore Jira Epic profile adopts no extension fields in this draft. Candidates
-such as sprint or story points need explicit disclosure approval first.
 
 ### Identity and dates
 
 `source_id` MUST include the source platform, source instance, and immutable
-native item ID. A Jira producer uses the issue's Atlassian Resource Identifier
-([ARI](https://developer.atlassian.com/platform/teamwork-graph/understanding-aris/)),
-`ari:cloud:jira:<cloud-id>:issue/<issue-id>`, built from the site's cloud ID and
-the immutable numeric issue ID, never the key. A Jira key alone is insufficient:
-keys can change and can collide across sites. `key` and `resource` may change
-without changing `source_id`. These are source identities, not TWG or Exchange
-document IDs.
+native item ID. The `key` and `resource` MAY change without changing `source_id`;
+these are source identities, not TWG or Exchange document IDs.
 
 Consumers MUST treat `source_id` as an opaque string compared by exact equality
-and MUST NOT parse it to recover the cloud ID, issue ID, or product. Producers
-MUST emit the ARI as Atlassian documents it, with no added normalization.
-Whether an issue's numeric ID survives a move between projects, and what
-happens to identities after a site migration, must be verified before
-implementation; a changed identity would appear as a new item.
+and MUST NOT parse it. Producers MUST emit the identity as their source
+documents it, with no added normalization. A changed identity would appear as a
+new item. See [Source profiles](#source-profiles) for platform-specific identity
+construction.
 
 Timestamps MUST be quoted RFC 3339 UTC strings with three fractional digits,
 for example `"2026-11-15T10:30:00.000Z"`. Dates MUST be quoted `YYYY-MM-DD`
@@ -355,118 +345,13 @@ It MUST NOT contain child descriptions, comments, or fields absent from child
 records. An empty child list omits the section. Whether children were queried
 and which ones qualify is a profile decision, not a format-level assumption.
 
-## Explore Jira Epic profile
+## Source profiles
 
-The following are the approved answers to the [scope outline](workdown.md).
-Changing the allowlist, child rule, or eligibility rule requires a new review
-and an update to the [disclosure decision](adr/0002-workdown-disclosure-boundary.md).
+Source-specific content rules and identity construction are documented in
+companion files. Source-profile approval and implementation readiness are
+separate from approval of this core format and are recorded in each profile.
 
-### Disclosure allowlist
-
-Use an Epic as the primary item and produce one document. Include only:
-
-| Semantic content | Jira mapping | Workdown location |
-| --- | --- | --- |
-| Source identity and URL | Installation cloud ID, immutable issue ID, current key and canonical browse URL | `source_id`, `key`, `resource` |
-| Summary and type | `summary`, `issuetype.name` | `title`, `work_type` |
-| Description | `description` ADF | Description section |
-| Workflow state | `status.name`, supported Jira status category | `work_status` |
-| Resolution and priority | `resolution.name`, `priority.name` | `resolution`, `priority` |
-| Labels | `labels` | `tags` |
-| Source timestamps | `created`, `updated` | `created_at`, `updated_at` |
-| Planned dates | Semantic Start date, system `duedate` | `start_date`, `due_date` |
-| Direct child summaries | Parent relationship and the child-record allowlist | `children` and Children table |
-
-The Explore profile does not emit `parent` for an Epic. Whether to disclose an
-Epic's own parent is a disclosure decision that needs separate approval.
-
-Resolve semantic custom fields using Jira's field metadata/schema and product
-semantics, never a hard-coded numeric ID or display-name match alone. Two sites
-with different field IDs MUST produce equivalent semantic content for otherwise
-equivalent fixtures. A known absent optional field is omitted. If a supported
-field cannot be resolved unambiguously, fail conversion rather than select a
-similarly named field. Exact supported schema identifiers and Jira project-type
-coverage remain an implementation prerequisite, not an assertion in this draft.
-
-Exclude comments, attachments, changelogs, worklogs, people fields, emails,
-watchers, votes, arbitrary custom fields, issue links, remote links, sprints,
-estimates, and all other fields not explicitly listed. Text already embedded
-in an allowed description is still disclosed; a field allowlist is not PII or
-secret redaction. Source administrators must understand that boundary.
-
-### Child inclusion and permission boundary
-
-Rule: include all direct children returned through the current Jira
-parent relationship, including completed children; no recursion, subtasks of
-children, linked issues, or legacy Epic Link fallback unless separately approved.
-Resolve the supported relationship per project type before implementation.
-Sort by immutable native issue ID in lexical order, not mutable keys or rank.
-Do not invent a child count or claim global completeness from a filtered query.
-
-Only the authorized sharing principal's readable Epic and children may be
-considered. App-level access alone MUST NOT authorize disclosure. Exclude items
-with issue-level security from this initial profile; fail an attempt to share
-such a primary item. The mechanism for determining eligibility must itself be
-verified for supported project types; uncertainty is a failure, not permission.
-Do not expose excluded item identities, titles, counts, or exclusion reasons in
-the shared document. All permitted direct children must be read and paginated
-successfully; an interrupted listing is not a valid smaller snapshot.
-
-Destination visibility remains unrestricted as agreed in the parent spec.
-Eligibility checks do not replicate source permissions or revoke copies already
-shared. Source permission changes and missed events can leave stale content;
-the parent spec's withdrawal and freshness limitations still apply.
-
-### Deterministic generation and failure behavior
-
-- Serialize fields in schema-table order and record fields in their defined
-  order. Use two-space YAML indentation and block lists, with quoted strings.
-- Use LF line endings, no byte-order mark, a blank line after Frontmatter and
-  around headings, and exactly one final newline. Preserve whitespace inside
-  code; outside code use a consistent Markdown serializer.
-- Deduplicate tags by exact string and sort them lexically by Unicode code
-  point. Preserve case and source prose; do not generate summaries.
-- Do not include export time, request IDs, elapsed time, transport identity,
-  publication sequences, or volatile statistics in canonical content.
-- Compare canonical UTF-8 bytes for content changes. An included `updated_at`
-  change is a content change even if the description is unchanged. Child
-  `updated` values are not included and alone do not change the document.
-- A successful read returning an empty optional value is not an API error.
-  Authentication failures, ambiguous supported field mappings, invalid required
-  values, incomplete pagination, or failed eligible child reads fail the whole
-  candidate. Never publish a partially generated replacement.
-- Enforce a reviewed hard byte limit and child-count limit before publication.
-  Exceeding either limit fails the candidate; do not silently truncate. Numeric
-  limits must be chosen against verified delivery, storage, and ingestion
-  constraints before implementation.
-- On failure, retain the last successful document and report the failure through
-  the parent application's status behavior. Do not put diagnostic errors or
-  restricted source data into Workdown. Initial failures create no Publication.
-
-There is no second Workdown revision counter. The parent spec allocates sequence
-numbers only after detecting changed canonical content; retries reuse bytes.
-
-### Event and ingestion implementation gates
-
-Before implementing this profile, verify and document event coverage for:
-
-1. Epic updates affecting any included field, and optional-field mapping changes.
-2. Child creation, edits to included summary fields, deletion, and reparenting.
-   Reparenting must locate both old and new Epics; deletion needs prior parent
-   context. Define how that context is retained when events omit it.
-3. Eligibility changes caused by issue security, project permissions, or sharing
-   principal changes. Do not claim these always produce usable Jira events.
-4. Source-Epic deletion, which remains explicitly unsupported by the parent spec.
-
-If required events or prior-parent data are unavailable, revise the
-profile or explicitly approve the freshness limitation; do not silently add
-polling or promise reconciliation. Event delivery does not guarantee a
-transactionally consistent multi-issue Jira snapshot.
-
-Verify the accepted TWG content MIME type and whether it retains Frontmatter,
-then test both Search indexing and the local viewer with representative content.
-Do not assume `text/markdown` is supported or that YAML becomes indexed metadata.
-Use a destination-local read URL and preserve `resource` only as provenance.
+- [Jira mapping research and profile](workdown-jira.md)
 
 ## Complete example
 
@@ -535,32 +420,24 @@ Let partners check availability before submitting an order.
 A standalone work item uses the same structure without `children` or the Children
 section. The core format has no Epic-specific field.
 
-## Acceptance tests for the eventual converter
+## Acceptance criteria for implementations
 
-Use fixture-based tests at the public Jira-to-document boundary, not private
-helper tests. At minimum, cover:
+All Workdown producers MUST verify:
 
-- A standalone item, an empty description, an Epic with no eligible children,
-  and an Epic containing multiple direct children.
-- Equivalent semantic custom fields with different site-specific IDs; absent,
-  ambiguous, and unreadable fields must have distinct expected outcomes.
-- Same source ID after a key change, and different source IDs for matching keys
-  on different sites.
-- Stable output after reordered API fields, labels, and paginated child results;
-  changed output after a supported content change.
-- Reparenting, completed children, excluded secure items, and partial child-read
-  failure without leaking identities or replacing the previous snapshot.
-- Heading-like source text, including every heading level, empty headings,
-  headings with inline formatting, headings in nested containers, and literal
-  lines beginning with `#`; Markdown table pipes, nested lists, code fences,
-  mentions, unsafe links, media, unsupported ADF, and attempted raw HTML.
-- Extension: an unadopted extension field is never emitted; adopted fields sort
-  deterministically; consumers ignore unknown namespaces; reserved or colliding
-  namespaces and `customfield_*` keys are rejected by the converter.
-- Safe YAML parsing, unknown format versions, invalid timestamps, duplicate item
-  identities, and size-limit rejection without truncation.
-- Unchanged bytes producing no Publication, and retries preserving bytes and
-  sequence through parent Command tests.
+- **Serialization determinism:** Unchanged content produces identical UTF-8 bytes;
+  field ordering and whitespace match the specification exactly.
+- **Identity stability:** Same source item produces the same `source_id` after
+  key or resource changes; a changed identity indicates a new item.
+- **Deterministic output:** Reordered API fields, labels, paginated results, and
+  retried reads produce identical bytes. Included content changes produce changed
+  bytes.
+- **Safe text handling:** Headings, mentions, unsafe links, media, and
+  unsupported source nodes are handled as specified. Raw HTML is never emitted.
+- **Extension discipline:** Unadopted extension fields are never emitted; adopted
+  fields sort deterministically. Consumers ignore unknown namespaces.
+- **Validation and limits:** Unknown format versions, invalid timestamps,
+  duplicate identities, and size-limit violations are rejected without silent
+  truncation.
 
-Actual Jira authorization/event behavior, TWG ingestion fidelity, and viewer
-safety require deployed verification; string fixtures alone do not prove them.
+Source-specific test suites, fixtures, and acceptance gates are documented in
+companion profiles; see [Source profiles](#source-profiles).

@@ -3,9 +3,10 @@
 Status: agreed scope; see the approved [Workdown specification](workdown-spec.md) for the format.
 
 The [Workdown specification](workdown-spec.md) builds on
-[Threaddown](threaddown.md). It defines a reusable work-item format and a
-separate Explore Jira Epic profile, whose field, child, and disclosure rules
-were approved on 2026-11-15. This outline records the earlier agreed scope.
+[Threaddown](threaddown.md). It defines a reusable work-item format with
+platform-specific profiles. The Explore Jira Epic profile's disclosure allowlist
+and child-inclusion rules were approved on 2026-11-15, as documented in
+[workdown-jira.md](workdown-jira.md). This outline records the earlier agreed scope.
 
 ## Problem Statement
 
