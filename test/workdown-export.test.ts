@@ -100,6 +100,22 @@ const startField = {
 };
 
 describe("workdown.export", () => {
+  it("resolves a positive Start date match when unrelated fields omit stableId", async () => {
+    const response = await call(
+      { ...epic, fields: { ...epic.fields, [startField.id]: "2026-11-20" } },
+      undefined,
+      200,
+      [
+        {
+          id: "customfield_999",
+          name: "Unrelated custom field",
+          schema: { type: "string" },
+        },
+        startField,
+      ],
+    );
+    expect(response.result).toContain('start_date: "2026-11-20"\n');
+  });
   it("omits readable empty optional name values", async () => {
     const response = await call({
       ...epic,

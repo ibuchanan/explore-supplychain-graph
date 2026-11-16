@@ -46,7 +46,17 @@ it("authenticates discovery and exports a real Epic through the deployed Forge w
     issue,
   });
   expect(response.status).toBe(200);
-  const result = (await response.json()) as { result?: unknown };
+  const result = (await response.json()) as {
+    result?: unknown;
+    error?: { code?: unknown };
+  };
+  if (result.error) {
+    const code =
+      typeof result.error.code === "number" ? result.error.code : "unknown";
+    throw new Error(
+      `workdown.export failed with JSON-RPC code ${code}; response content suppressed`,
+    );
+  }
   // Boolean assertions avoid printing customer documents or credentials on failure.
   expect(validateWorkdown(result.result)).toBe(true);
   const metadata = parse(

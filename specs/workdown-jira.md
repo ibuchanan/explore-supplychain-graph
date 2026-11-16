@@ -277,6 +277,27 @@ test separately for both site URLs/credentials; collect sanitized evidence of
 different field IDs and both project types before marking ticket 04 done.
 This optional assertion variable is not a Forge runtime secret or manifest input.
 
+### First ticket 04 cloud failure and correction (2026-11-16)
+
+The user deployed development 3.1.0 and confirmed the installation was current.
+The first deployed test failed before the expected Start date assertion.
+Sanitized structured log readback showed JSON-RPC `field-unreadable` (-32004).
+Read-only caller-token diagnostics found all requested scalar fields present,
+but 38 unrelated custom fields on the first catalog page lacked `stableId`.
+Rejecting the whole catalog for those unrelated omissions was too strict.
+
+The corrected parser tolerates unrelated missing discriminators when there is
+a unique positive semantic match. It still fails zero-match inference as
+`field-unreadable` when custom fields lack semantic metadata. Positive matches
+must retain compatible schema and project applicability; no name fallback was
+introduced. A regression test reproduced the cloud shape red, then passed.
+Full read-only enumeration found 274 site fields across six pages and 243
+project-filtered fields across five pages, each with one compatible Start date
+match. No IDs, issue values, credentials, or documents were printed or saved.
+This is direct Jira-read evidence for the configured site, not a passing
+installed-app export or two-site/team-managed coverage. Redeployment and the
+installed integration rerun remain pending approval.
+
 ### Extension fields
 
 The Jira profile adopts no extension fields in this draft. Candidates

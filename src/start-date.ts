@@ -46,9 +46,7 @@ async function catalog(
           !field ||
           typeof field.id !== "string" ||
           !field.schema ||
-          typeof field.schema.type !== "string" ||
-          (field.id.startsWith("customfield_") &&
-            (typeof field.stableId !== "string" || !field.stableId.trim())),
+          typeof field.schema.type !== "string",
       )
     )
       return;
@@ -74,7 +72,14 @@ export async function resolveStartDate(
     const matches = fields.filter(
       (field) => field.stableId === "sfid:jira-software:start-date",
     );
-    if (!matches.length) return {};
+    if (!matches.length)
+      return fields.some(
+        (field) =>
+          field.id.startsWith("customfield_") &&
+          (typeof field.stableId !== "string" || !field.stableId.trim()),
+      )
+        ? { error: "field-unreadable" }
+        : {};
     const field = matches[0];
     if (
       matches.length !== 1 ||
@@ -92,7 +97,14 @@ export async function resolveStartDate(
     const candidates = applicable.filter(
       (item) => item.id === field.id || item.stableId === field.stableId,
     );
-    if (!candidates.length) return {};
+    if (!candidates.length)
+      return applicable.some(
+        (item) =>
+          item.id.startsWith("customfield_") &&
+          (typeof item.stableId !== "string" || !item.stableId.trim()),
+      )
+        ? { error: "field-unreadable" }
+        : {};
     const candidate = candidates[0];
     return candidates.length === 1 &&
       candidate?.id === field.id &&
