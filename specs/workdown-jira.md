@@ -11,7 +11,7 @@ gates](#event-and-ingestion-implementation-gates) for research findings, and
 implementation gates and field-mapping resolution are documented below as
 research findings, distinct from the approved profile. Approval does not satisfy
 the implementation gates or settle the byte and child-count numeric limits,
-which must be resolved before the converter ships.
+which must be confirmed by deployed verification before the converter ships.
 
 ## Accepted Decisions (2026-11-15)
 
@@ -23,7 +23,7 @@ The following decisions have been approved by Ian Buchanan and adopted for imple
 
 3. **Numeric ID stability across project moves:** Accept that Jira retains an issue's numeric ID when an issue moves between projects, enabling `source_id` stability across key and resource changes within the same site. Site migration is outside implementation scope.
 
-These decisions are implementation-ready; verification gates below remain open for integration testing (ticket 10).
+These decisions are implementation-ready; verification gates below remain open for integration testing (export tickets 03–08).
 
 ## Jira metadata research findings
 
@@ -97,7 +97,7 @@ documents the `stableId` expansion and describes this endpoint as returning
 fields for classic projects. The observation does not establish universal
 coverage of team-managed project-local fields. Cross-site equivalence with
 independently configured sites and full authorization/applicability verification
-remain open for integration testing (ticket 10).
+remain open for integration testing (export tickets 03–08).
 
 ### Field metadata permissions and authorization
 
@@ -106,14 +106,14 @@ Buchanan confirmed on 2026-11-15 that the account used for the successful browse
 captures is not a Jira administrator on the sampled site. Combined with the
 complete catalog capture, this provides a positive example of non-admin browser
 access to `stableId` metadata. Forge-runtime authorization remains an
-integration test gate (ticket 10).
+integration test gate (export tickets 03–08).
 
 - [Paginated field search](https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-fields/#api-rest-api-3-field-search-get)
   supports `expand=stableId`, describes classic-project fields, and lists
   "permission to access Jira" as a requirement. Its documented `403` example
   says only Jira administrators can access fields. Test the eventual app access
   mode and a representative non-site-admin sharing principal to establish the
-  actual authorization boundary (ticket 10).
+  actual authorization boundary (export tickets 03–08).
 - [Get fields](https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-fields/#api-rest-api-3-field-get)
   documents no required permission but returns a visibility-filtered catalog
   under field/configuration and Browse Projects rules. Its documented response
@@ -186,7 +186,7 @@ The approved system-parent rule and prohibition on legacy Epic Link fallback
 remain unchanged. A site-local legacy field identifier is evidence for this
 comparison only, not a portable mapping or an implementation constant.
 
-### Integration and acceptance test gates (ticket 10)
+### Integration and acceptance test gates (export tickets)
 
 The following verification gates remain open for implementation acceptance testing:
 
@@ -317,8 +317,9 @@ the parent spec's withdrawal and freshness limitations still apply.
   candidate. Never publish a partially generated replacement.
 - Enforce a reviewed hard byte limit and child-count limit before publication.
   Exceeding either limit fails the candidate; do not silently truncate. Numeric
-  limits must be chosen against verified delivery, storage, and ingestion
-  constraints before implementation.
+  limits start as provisional values from documented delivery, storage, and
+  ingestion constraints, and are confirmed or adjusted by deployed ingestion
+  verification before the converter ships.
 - On failure, retain the last successful document and report the failure through
   the parent application's status behavior. Do not put diagnostic errors or
   restricted source data into Workdown. Initial failures create no Publication.
@@ -328,7 +329,9 @@ numbers only after detecting changed canonical content; retries reuse bytes.
 
 ### Event and ingestion implementation gates
 
-Before implementing this profile, verify and document event coverage for:
+These gates are verified during implementation, in the first ticket that touches
+each behavior, on a deployed site; findings are recorded here. They do not gate
+ticket creation. Verify and document event coverage for:
 
 1. Epic updates affecting any included field, and optional-field mapping changes.
 2. Child creation, edits to included summary fields, deletion, and reparenting.

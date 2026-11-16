@@ -16,7 +16,7 @@ The app immediately converts each Subject's curated Jira context into one Workdo
 
 The destination retains the latest document and ingests it as a TWG Document with unrestricted destination visibility. Once ingestion is acknowledged, a Publication becomes observable through Commands, a destination-local event, and an optional destination-owned Automation incoming webhook. Destination Automation Flows may act on this context; the app itself has no direct means to modify Jira work items and does not route incoming content to local projects or Epics.
 
-Delivery is backend-first: business Commands specified with OpenRPC, implemented with help from `forge-ahead-rpc`, and tested before UI is layered on. Individual JSON-RPC methods become ticket-sized units only after review of the overall specification and method inventory.
+Delivery is backend-first: business Commands specified with OpenRPC, implemented with help from `forge-ahead-rpc`, and tested before UI is layered on. Work is sliced vertically around Commands: the user defines each Command in the OpenRPC document before its ticket starts, after the OpenRPC path itself is bootstrapped with only the standard discovery method.
 
 ## User Stories
 
@@ -111,11 +111,10 @@ Delivery is backend-first: business Commands specified with OpenRPC, implemented
 ### Delivery sequence
 
 1. Review the overall scope and separate Workdown outline.
-2. Resolve Workdown semantics and Connection/security design needed for implementation; document meaningful trade-offs where appropriate.
-3. Define and review the OpenRPC method inventory and contracts.
-4. Create local tickets using JSON-RPC methods as the unit of work.
-5. Implement Commands with local and deployed-Forge automated coverage.
-6. Layer UI on the tested contracts, including the local document reading experience.
+2. Resolve Workdown semantics and Connection/security design needed for implementation; document meaningful trade-offs where appropriate. Unknown platform behavior (issue security, Jira events, TWG ingestion) is characterized on a deployed site during the first implementation ticket that touches it, with evidence captured via `forge logs`; it does not gate ticket creation.
+3. Bootstrap the OpenRPC document with only the standard discovery method, proving the local and deployed-Forge JSON-RPC path.
+4. Create local tickets as vertical slices, each centered on one Command (or a closely related few). Before a Command-centric ticket starts, the user defines the Command in the OpenRPC document and approves it; each slice then owns its contract, built test-first with local and deployed-Forge automated coverage. A full method inventory is not a prerequisite for starting slices.
+5. Layer UI on the tested contracts, including the local document reading experience.
 
 ## Testing Decisions
 
