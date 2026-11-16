@@ -56,7 +56,7 @@ Delivery is backend-first: business Commands specified with OpenRPC, implemented
 ### Domain and authorization
 
 - Use the project glossary's vocabulary. A Peer Connection is directional despite requiring mutual Site Admin authorization. A site may participate as both Source and Destination through separate Connections.
-- Connection lifecycle: pending invitation, destination acceptance into active state, and revocation by either side. The concrete handshake and authentication protocol require a follow-on design before implementation.
+- Connection lifecycle: pending invitation, destination acceptance into active state, and revocation by either side. The handshake and authentication policy are defined in [ADR 0003](adr/0003-directional-peer-connection-security.md); implementation still requires approved Command contracts and deployed verification.
 - Site Admins authorize Connections. Source Project Admins decide which Epics to share and when sharing begins. Validate project authority at the business boundary; app-level Jira access must not bypass it.
 - No per-Exchange destination approval. No destination project, destination Epic, or destination work-routing configuration is required.
 - Jira is the only source product. An Epic is the Subject. Shared context is read-only to recipients.
@@ -106,7 +106,7 @@ Delivery is backend-first: business Commands specified with OpenRPC, implemented
 - Command includes read-only operations. Exact method names, parameter/result schemas, and error contracts are not approved by this scope document.
 - Responsibility groups include Connection invitation/acceptance/inspection/revocation, Exchange initiation/inspection, current-document retrieval, Publication/delivery status, and destination webhook configuration. Grouping is not a ticket inventory.
 - Keep business behavior independent of JSON-RPC transport, Forge runtime adapters, and eventual UI. Jira events reuse application behavior rather than implementing a second publication pipeline.
-- Security outcomes: authenticate peer installations and direction, authorize callers, detect tampering, protect secrets, and reject traffic on revoked Connections. Protocol choice, replay defenses, invitation expiry, and credential lifecycle need a focused design before the affected Commands are built.
+- Security outcomes: authenticate peer installations and direction, authorize callers, detect tampering, protect secrets, and reject traffic on revoked Connections. Protocol choice, replay defenses, invitation expiry, credential lifecycle, and audit ownership are decided in [ADR 0003](adr/0003-directional-peer-connection-security.md). Its implementation gates apply before the affected Commands ship.
 
 ### Delivery sequence
 
@@ -157,6 +157,7 @@ Delivery is backend-first: business Commands specified with OpenRPC, implemented
 - [Domain glossary](../GLOSSARY.md)
 - [Workdown scope and open decisions](workdown.md)
 - [Unrestricted visibility ADR](adr/0001-unrestricted-destination-visibility.md)
+- [Directional Peer Connection security ADR](adr/0003-directional-peer-connection-security.md)
 - [Forge TWG connector module](https://developer.atlassian.com/platform/forge/manifest-reference/modules/teamwork-graph-connector/)
 - [TWG setObjects](https://developer.atlassian.com/platform/teamwork-graph/connector-reference/object-operations/set-objects/)
 - [TWG deletion by external ID](https://developer.atlassian.com/platform/teamwork-graph/connector-reference/object-operations/delete-objects-by-external-id/)
