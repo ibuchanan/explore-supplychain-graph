@@ -135,8 +135,21 @@ is no longer anonymous. The application contract is unchanged.
   issues return `forbidden` (-32001); readable non-Epics return
   `profile-mismatch` (-32002); invalid inputs return `invalid-params` (-32602).
   Unexpected reads, invalid output, and unsupported descriptions fail without
-  returning content. A fixed `workdown.rpc.completed` log marker contains no
-  identifiers, content, credentials, or endpoint URLs.
+  returning content. Both entry points use `@forge-ahead/logging` with logger
+  name `workdown`, invocation lifecycle logging, and ambient context. Each
+  completed response emits `workdown.rpc.completed` with a generated random
+  `requestId`, operation, duration, HTTP status, and success/failure outcome;
+  JSON-RPC errors over HTTP 200 are failures and include only their numeric
+  `rpcErrorCode`. Unexpected thrown failures emit `workdown.rpc.failed` using
+  an empty allow-list error policy (no raw messages or stack traces), then are
+  rethrown unchanged. Request bodies, headers, query parameters, response
+  documents, tenant/account/issue identifiers, and endpoint URLs are never
+  passed to the logger. The correlation ID is generated locally, not copied
+  from untrusted JSON-RPC or HTTP inputs. Default redaction remains a backstop.
+  `LOG_LEVEL` uses the package's environment-aware defaults; a named override
+  such as `workdown=debug` is supported. No additional runtime variable is
+  required. These are operational logs, not durable audit events; use the
+  outcome field rather than the completion message alone to identify success.
 - **Deployment review:** manifest adds backend egress to
   `https://api.atlassian.com`; no OAuth scopes, runtime secrets, storage, modules,
   or app identity changes. Forge lint reports a major-version approval gate for
