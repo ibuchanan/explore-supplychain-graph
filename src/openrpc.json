@@ -3,11 +3,31 @@
   "info": { "title": "Explore Supplychain Graph", "version": "0.1.0" },
   "methods": [
     {
-      "name": "rpc.discover",
-      "summary": "Discover the app's OpenRPC contract",
+      "name": "workdown.export",
+      "summary": "Export a Jira issue as the Workdown document an Exchange would share",
+      "description": "Read-only. Reads one issue as the caller, checks it against the named profile, and returns its Workdown document. Never stores or publishes anything. The caller must be able to read the issue. An issue that does not exist and one the caller cannot read produce the same forbidden error. An issue that does not satisfy the profile produces profile-mismatch.",
       "paramStructure": "by-name",
-      "params": [],
-      "result": { "name": "OpenRPC document", "schema": { "type": "object" } }
+      "params": [
+        {
+          "name": "profile",
+          "required": true,
+          "schema": { "type": "string", "enum": ["jira-epic"] }
+        },
+        {
+          "name": "issue",
+          "required": true,
+          "schema": { "type": "string", "minLength": 1, "maxLength": 255 }
+        }
+      ],
+      "result": {
+        "name": "Workdown document",
+        "schema": { "type": "string", "minLength": 1 }
+      },
+      "x-forge-ahead": {
+        "web": true,
+        "execution": "asUser",
+        "audit": "standard"
+      }
     }
   ]
 }

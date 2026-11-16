@@ -1,20 +1,18 @@
-import { dispatch } from "./rpc";
+import { createWebtrigger } from "@forge-ahead/rpc/webtrigger";
+import { authenticate, installation } from "./jira";
+import { options } from "./rpc";
 
-type WebtriggerRequest = { method: string; body?: string };
+const handle = createWebtrigger({
+  ...options,
+  installation,
+  authenticate,
+  context: (installation, principal) => ({ installation, principal }),
+});
 
-export const runSync = async (request: WebtriggerRequest) => {
-  if (request.method !== "POST") {
-    return {
-      body: "",
-      headers: { "Content-Type": ["application/json"], Allow: ["POST"] },
-      statusCode: 405,
-    };
-  }
-  return {
-    body: JSON.stringify(await dispatch(request.body ?? "")),
-    headers: { "Content-Type": ["application/json"] },
-    statusCode: 200,
-  };
+export const runSync: typeof handle = async (request, context) => {
+  const response = await handle(request, context);
+  if (response.statusCode === 200) console.info("workdown.rpc.completed");
+  return response;
 };
 
 export const runAsync = runSync;

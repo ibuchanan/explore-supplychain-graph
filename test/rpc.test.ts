@@ -1,6 +1,25 @@
 import { describe, expect, it } from "vitest";
-import document from "../src/openrpc.json";
-import { dispatch } from "../src/rpc";
+import contract from "../src/openrpc.json";
+
+const document = {
+  ...contract,
+  methods: contract.methods.map(
+    ({ "x-forge-ahead": _policy, ...method }) => method,
+  ),
+};
+
+import { dispatch as dispatchCommand } from "../src/rpc";
+
+const dispatch = (request: unknown) =>
+  dispatchCommand(request, {
+    installation: {
+      cloudId: "00000000-0000-4000-8000-000000000001",
+      apiBase:
+        "https://api.atlassian.com/ex/jira/00000000-0000-4000-8000-000000000001",
+    },
+    principal: { accountId: "reader", authorization: "Basic dGVzdDpmYWtl" },
+  });
+
 import { validateOpenRpc } from "./openrpc";
 
 describe("discovery dispatcher", () => {
@@ -48,7 +67,7 @@ describe("discovery dispatcher", () => {
       dispatch({
         jsonrpc: "2.0",
         id: 2,
-        method: "workdown.export",
+        method: "nonexistent.method",
         params: {},
       }),
     ).resolves.toEqual({
@@ -67,7 +86,7 @@ describe("discovery dispatcher", () => {
       error: { code: -32600, message: "Invalid request" },
     });
   });
-  it("returns the discovery-only OpenRPC document", async () => {
+  it("serves the application contract, which does not list discovery itself", async () => {
     const response = await dispatch({
       jsonrpc: "2.0",
       id: "discovery",
@@ -78,19 +97,10 @@ describe("discovery dispatcher", () => {
     expect(response).toEqual({
       jsonrpc: "2.0",
       id: "discovery",
-      result: {
-        openrpc: "1.3.2",
-        info: { title: "Explore Supplychain Graph", version: "0.1.0" },
-        methods: [
-          {
-            name: "rpc.discover",
-            summary: "Discover the app's OpenRPC contract",
-            paramStructure: "by-name",
-            params: [],
-            result: { name: "OpenRPC document", schema: { type: "object" } },
-          },
-        ],
-      },
+      result: document,
     });
+    expect(document.methods.map((method) => method.name)).toEqual([
+      "workdown.export",
+    ]);
   });
 });
