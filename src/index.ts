@@ -1,19 +1,20 @@
-const buildOutput = (rnd: number) => ({
-  body: '{"hello": "world"}',
-  headers: {
-    "Content-Type": ["application/json"],
-    "X-Request-Id": [`rnd-${rnd}`],
-  },
-  statusCode: 200,
-  statusText: "OK",
-});
+import { dispatch } from "./rpc";
 
-export const runAsync = (): Promise<ReturnType<typeof buildOutput>> => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve(buildOutput(Math.random()));
-    }, 1000);
-  });
+type WebtriggerRequest = { method: string; body?: string };
+
+export const runSync = async (request: WebtriggerRequest) => {
+  if (request.method !== "POST") {
+    return {
+      body: "",
+      headers: { "Content-Type": ["application/json"], Allow: ["POST"] },
+      statusCode: 405,
+    };
+  }
+  return {
+    body: JSON.stringify(await dispatch(request.body ?? "")),
+    headers: { "Content-Type": ["application/json"] },
+    statusCode: 200,
+  };
 };
 
-export const runSync = () => buildOutput(Math.random());
+export const runAsync = runSync;

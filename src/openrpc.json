@@ -1,0 +1,13 @@
+{
+  "openrpc": "1.3.2",
+  "info": { "title": "Explore Supplychain Graph", "version": "0.1.0" },
+  "methods": [
+    {
+      "name": "rpc.discover",
+      "summary": "Discover the app's OpenRPC contract",
+      "paramStructure": "by-name",
+      "params": [],
+      "result": { "name": "OpenRPC document", "schema": { "type": "object" } }
+    }
+  ]
+}

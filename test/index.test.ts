@@ -1,35 +1,30 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { runAsync, runSync } from "../src/index";
+import document from "../src/openrpc.json";
 
-describe("scaffold web triggers", () => {
-  afterEach(() => {
-    vi.useRealTimers();
-    vi.restoreAllMocks();
+describe.each([runSync, runAsync])("discovery webtrigger", (handler) => {
+  it("rejects non-POST transport requests", async () => {
+    const response = await handler({ method: "GET" });
+    expect(response.statusCode).toBe(405);
   });
 
-  const expectedResponse = {
-    body: '{"hello": "world"}',
-    headers: {
-      "Content-Type": ["application/json"],
-      "X-Request-Id": ["rnd-0.5"],
-    },
-    statusCode: 200,
-    statusText: "OK",
-  };
+  it("serves discovery as a JSON-RPC HTTP response", async () => {
+    const response = await handler({
+      method: "POST",
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: "http",
+        method: "rpc.discover",
+        params: {},
+      }),
+    });
 
-  it("returns a JSON response from the synchronous trigger", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
-
-    expect(runSync()).toEqual(expectedResponse);
-  });
-
-  it("returns the same response after the asynchronous delay", async () => {
-    vi.useFakeTimers();
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
-    const response = runAsync();
-
-    await vi.advanceTimersByTimeAsync(1000);
-
-    await expect(response).resolves.toEqual(expectedResponse);
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["Content-Type"]).toEqual(["application/json"]);
+    expect(JSON.parse(response.body)).toEqual({
+      jsonrpc: "2.0",
+      id: "http",
+      result: document,
+    });
   });
 });

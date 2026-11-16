@@ -1,5 +1,7 @@
 # Development
 
+<!-- cspell:words openrpc webtrigger webtriggers supplychain WORKDOWN -->
+
 Install dependencies with `npm install`.
 Run the checks before sending a pull request:
 
@@ -94,6 +96,95 @@ repository's `forge:*` names; use the scripts in this repository's `package.json
 [runtime]: https://github.com/ibuchanan/ranch-rig-fence-rider/blob/main/docs/how-to/runtime.md
 [forge-tooling]: https://github.com/ibuchanan/ranch-rig-fence-rider/blob/main/docs/how-to/use-forge-tooling.md
 [tutorial]: https://github.com/ibuchanan/ranch-rig-fence-rider/blob/main/docs/tutorials/tutorial.md
+
+## Exercise JSON-RPC discovery
+
+`src/openrpc.json` is the contract source. For ticket 02 it declares only
+`rpc.discover`; no application Commands are implemented. `src/rpc.ts` registers
+that method with the installed `@forge-ahead/rpc` dispatcher. The library's
+application-contract generator rejects the reserved discovery method, so this
+bootstrap does not generate application handlers or validators. Future Command
+contracts must be approved before implementing them.
+
+Run the local dispatcher and webtrigger tests with `npm test`, or all repository
+checks with `npm run check`. The OpenRPC document is checked against the standard
+meta-schema and its JSON Schema dialect. These validators are test-only and are
+not imported into the Forge runtime. Format assertions are disabled; structural
+schema validation remains enabled.
+
+### Invoke an approved development installation
+
+Deployment and installation require separate approval of the target app,
+site, product, and environment. This slice changes no manifest modules, scopes,
+or external permissions: both existing dynamic webtriggers now dispatch the same
+JSON-RPC discovery request instead of the scaffold response.
+
+After an approved deployment, list the existing installation URLs:
+
+```sh
+forge webtrigger list --site <approved-site> --product jira --environment <approved-environment>
+```
+
+If none exists, an authorized site administrator can generate one with
+`forge webtrigger create`, selecting the approved installation and the
+`explore-supplychain-graph-webtrigger-sync` module. URL creation is a separate
+remote write; do not run it without approval. The async module is an alias for
+the same handler, with no artificial delay.
+
+Set `WORKDOWN_RPC_URL` locally to that HTTPS URL, then run:
+
+```sh
+npm run test:deployed
+```
+
+This test makes a real HTTP POST to Forge and compares the complete JSON-RPC
+response with the local contract, then validates the returned OpenRPC document.
+It is excluded from ordinary local checks. An explicit deployed test fails when
+the URL is missing, rather than silently skipping. A missing URL failure is not
+cloud execution evidence. Do not commit installation URLs or raw runtime context.
+
+For a manual invocation using the same local variable:
+
+```sh
+curl --request POST "$WORKDOWN_RPC_URL" \
+  --header 'Content-Type: application/json' \
+  --data '{"jsonrpc":"2.0","id":"manual","method":"rpc.discover","params":{}}'
+```
+
+The backbone accepts a single request with named `params` and a string or number
+`id`; batch requests, notifications, and positional parameters are unsupported.
+Protocol errors use JSON-RPC error envelopes over HTTP 200; non-POST requests
+receive HTTP 405. Invalid JSON produces parse-error `-32700`, malformed envelopes
+invalid-request `-32600`, and unknown methods method-not-found `-32601`.
+
+### Caller and installation boundary
+
+Forge routes the webtrigger URL to a particular installation and passes the HTTP
+payload as the first handler argument and runtime context separately as the
+second. It does **not** authenticate webtrigger callers. The bootstrap deliberately
+ignores runtime context and supplies no caller or installation authority to the
+static discovery handler. Headers, query parameters, and JSON-RPC parameters do
+not establish an Atlassian user or a trusted installation.
+
+Only the static app contract is exposed; there are no Jira reads, secrets,
+storage operations, or app-level actions. Before adding any application Command
+to this public transport, establish verified caller authentication and trusted
+installation binding (or select an authenticated Forge entry point). Do not infer
+`asUser` authority from a request-supplied account ID. The library's authenticated
+webtrigger adapter requires app-owned authentication; it is not used to invent
+an anonymous principal here.
+
+**Evidence, 2026-11-16:** local red–green tests, schema validation, typecheck,
+build, and `npm run check` passed. The deployed test's missing-URL prerequisite
+failure was observed; no cloud request, deployment, installation, URL creation,
+or runtime log inspection was performed. Ticket 02 remains blocked on approved
+deployment and a real passing deployed test, including sanitized runtime-context
+observations. It is not complete and does not yet unblock ticket 03.
+
+Platform references checked for this slice:
+[webtrigger runtime](https://developer.atlassian.com/platform/forge/runtime-reference/web-trigger/),
+[request/response events](https://developer.atlassian.com/platform/forge/events-reference/web-trigger/),
+and [webtrigger CLI](https://developer.atlassian.com/platform/forge/cli-reference/webtrigger/).
 
 ## Repository layout
 
