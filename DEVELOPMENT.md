@@ -175,11 +175,21 @@ webtrigger adapter requires app-owned authentication; it is not used to invent
 an anonymous principal here.
 
 **Evidence, 2026-11-16:** local red–green tests, schema validation, typecheck,
-build, and `npm run check` passed. The deployed test's missing-URL prerequisite
-failure was observed; no cloud request, deployment, installation, URL creation,
-or runtime log inspection was performed. Ticket 02 remains blocked on approved
-deployment and a real passing deployed test, including sanitized runtime-context
-observations. It is not complete and does not yet unblock ticket 03.
+build, and `npm run check` passed. The developer deployed version 2.0.0 to
+development and installed it in Jira on the development test site. After explicit
+approval, the sync webtrigger URL was created and `npm run test:deployed` passed
+at 09:28 (one real cloud test, about 2.1 seconds). It verified HTTP 200, the exact
+JSON-RPC envelope and contract, and standard OpenRPC structural validity.
+Ticket 02's deployed-test gate is satisfied; ticket 03 still requires its own
+approved Command definition.
+
+A bounded `forge logs` read for the sync function returned no entries. The
+handler emits no application logs, and no raw runtime context was captured or
+exposed. Caller identity and installation-context contents were not dynamically
+verified; the static discovery handler ignores both. Authenticated caller and
+trusted installation binding remain prerequisites for data-bearing Commands,
+not properties established by this discovery test. Installation URLs are omitted
+from committed evidence.
 
 Platform references checked for this slice:
 [webtrigger runtime](https://developer.atlassian.com/platform/forge/runtime-reference/web-trigger/),
