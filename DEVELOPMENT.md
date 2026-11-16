@@ -196,6 +196,112 @@ Platform references checked for this slice:
 [request/response events](https://developer.atlassian.com/platform/forge/events-reference/web-trigger/),
 and [webtrigger CLI](https://developer.atlassian.com/platform/forge/cli-reference/webtrigger/).
 
+## Credentials for deployed integration tests
+
+From ticket 03 onward, deployed tests call authenticated Commands. The RPC
+backbone's webtrigger adapter checks an `Authorization` credential on every
+request. The development loop uses a Jira API token and accepts a caller who
+is a user and an administrator of the site. This is the TDD-loop model, not the
+end-user authentication the app will eventually need. Ticket 03 defines the
+exact header format; the names below are proposals that ticket 03 finalizes.
+
+| Name                      | What it is                                              | Storage role                                          |
+| ------------------------- | ------------------------------------------------------- | ----------------------------------------------------- |
+| `WORKDOWN_RPC_URL`        | Webtrigger URL of the approved development installation | `project_secrets` (a capability URL; treat as secret) |
+| `WORKDOWN_TEST_EMAIL`     | Atlassian account email of the test user (a site admin) | `project_config`                                      |
+| `WORKDOWN_TEST_API_TOKEN` | That user's Atlassian API token                         | `project_secrets`                                     |
+
+### Where these values go
+
+These are **local** variables: only the test process on your workstation or CI
+runner reads them. Do not list them in `[scopes.runtime]`, which uploads values
+to Forge where the deployed function can read them, and do not list them in
+`[scopes.manifest]`. Only values the deployed app itself needs belong in the
+runtime scope. See Fence Rider's explanation of
+[the three kinds of variables](node_modules/fence-rider/docs/explanation/three-kinds-of-env-vars.md).
+
+Fence Rider wraps `variables`, `deploy`, `install`, `lint`, and `tunnel`; it does
+not run tests. Run tests through SecretSpec directly.
+
+### Declare them
+
+Ticket 03 adds declarations like these to `secretspec.toml`, with no values:
+
+```toml
+[profiles.default.WORKDOWN_RPC_URL]
+description = "Webtrigger URL of the approved development installation"
+required = false
+providers = ["project_secrets"]
+
+[profiles.default.WORKDOWN_TEST_EMAIL]
+description = "Email of the site-admin test user"
+required = false
+providers = ["project_config"]
+
+[profiles.default.WORKDOWN_TEST_API_TOKEN]
+description = "API token of the site-admin test user"
+required = false
+providers = ["project_secrets"]
+```
+
+Keep `required = false`. Fence Rider resolves the whole profile before deploys,
+so a required test credential would block every deploy for anyone who has not
+stored it. The deployed test fails explicitly when a value is missing, as the
+discovery test does for `WORKDOWN_RPC_URL`.
+
+### Obtain and store them
+
+Run these yourself in a trusted terminal, with shell tracing off and no terminal
+recording or agent capture while you enter secrets.
+
+1. **Webtrigger URL.** After an approved deploy and install, use
+   `forge webtrigger list` as in the section above. Creating a URL is a remote
+   write and needs approval.
+2. **API token.** Sign in as the test user (an administrator of the development
+   site) and create a token under your Atlassian account's Security settings
+   (`https://id.atlassian.com/manage-profile/security/api-tokens`). Label it for
+   this project and set an expiry. Confirm with ticket 03 which token type the
+   authenticator expects.
+3. **Store them** (enter the value at the prompt; write to the same role the
+   declaration reads from):
+
+   ```sh
+   secretspec set --provider project_secrets --profile default WORKDOWN_RPC_URL
+   secretspec set --provider project_config --profile default WORKDOWN_TEST_EMAIL
+   secretspec set --provider project_secrets --profile default WORKDOWN_TEST_API_TOKEN
+   ```
+
+   Provider setup is in Fence Rider's
+   [user-provider guide](node_modules/fence-rider/docs/how-to/configure-user-providers.md)
+   and [app secrets guide](node_modules/fence-rider/docs/how-to/configure-app-secrets.md).
+
+### Use them
+
+Check that the names resolve without printing values:
+
+```sh
+secretspec check --scope '' --explain
+```
+
+Run the deployed tests with the whole profile injected into the test process:
+
+```sh
+secretspec run --scope '' -- npm run test:deployed
+```
+
+Never use `secretspec get`, `printenv`, or log output to inspect real values, and
+never echo the `Authorization` header from a test. A coding agent must not read
+these values. Run the deployed test yourself, or explicitly authorize an agent
+to run it through `secretspec run` and keep the output free of credentials.
+
+### Rotation and further sites
+
+API tokens expire: create a new one and `secretspec set` it again. A webtrigger
+URL changes only if it is recreated or the module key or `urlFormat` changes. A
+second development site (needed for cross-site tickets) needs its own URL and
+credentials; choose separate names or a separate SecretSpec profile when it
+exists.
+
 ## Repository layout
 
 - `.atlassian/`: Repository ownership metadata.
