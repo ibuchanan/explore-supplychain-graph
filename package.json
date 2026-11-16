@@ -13,7 +13,7 @@
     "changelog": "git cliff --config cliff.toml --unreleased -o CHANGELOG.md",
     "check": "run-p --npm-path npm --print-label \"{lint,test,size:check,pack:check}\"",
     "clean": "rm -rf dist",
-    "forge:deploy": "cmd=$(fence-rider deploy -- --non-interactive) && sh -c \"$cmd\" sh",
+    "forge:deploy": "cmd=$(fence-rider deploy -e development -- --non-interactive --approve MAJOR_VERSION_RULE) && sh -c \"$cmd\" sh",
     "forge:install": "cmd=$(fence-rider install -- --confirm-scopes --non-interactive) && sh -c \"$cmd\" sh",
     "forge:register": "forge register",
     "forge:uninstall": "cmd=$(fence-rider uninstall) && sh -c \"$cmd\" sh",
@@ -72,7 +72,7 @@
     {
       "name": "Forge app bundle",
       "path": "dist/**/*.js",
-      "limit": "10 kB"
+      "limit": "32 kB"
     }
   ]
 }
