@@ -246,6 +246,9 @@ $RECYCLE.BIN/
 .session/
 tmp/
 
+# Private deployed-test issue identities and expectations
+/test/deployed.local.json
+
 # CocoIndex Code (ccc)
 /.cocoindex_code/
 # End of drop-calf additional ignores

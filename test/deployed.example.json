@@ -1,0 +1,18 @@
+{
+  "issues": {
+    "epicWithStartDate": {
+      "key": "MSD-1",
+      "projectType": "company-managed",
+      "expected": {
+        "start_date": "2025-08-16"
+      }
+    },
+    "epicWithoutStartDate": {
+      "key": "LEO-9",
+      "projectType": "team-managed",
+      "expected": {
+        "start_date": null
+      }
+    }
+  }
+}
