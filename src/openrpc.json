@@ -5,7 +5,7 @@
     {
       "name": "workdown.export",
       "summary": "Export a Jira issue as the Workdown document an Exchange would share",
-      "description": "Read-only. Reads one issue as the caller, checks it against the named profile, and returns its Workdown document. Never stores or publishes anything. The document contains only the profile's allowlisted fields; nothing else on the issue is ever included. An optional field that is empty or not configured is omitted. Start date is found by its stable semantic identity, never by display name or a fixed field ID, so equivalent issues on different sites produce the same document. The caller must be able to read the issue. An issue that does not exist and one the caller cannot read produce the same forbidden error. An issue that does not satisfy the profile produces profile-mismatch. A field that cannot be resolved to exactly one supported field produces field-unresolved. A field or value that cannot be read produces field-unreadable. A failed export never returns a partial document.",
+      "description": "Read-only. Reads one issue as the caller, checks it against the named profile, and returns its Workdown document. Never stores or publishes anything. The document contains only the profile's allowlisted fields; nothing else on the issue is ever included. An optional field that is empty or not configured is omitted. Start date is found by its stable semantic identity, never by display name or a fixed field ID, so equivalent issues on different sites produce the same document. The caller must be able to read the issue. An issue that does not exist and one the caller cannot read produce the same forbidden error. An issue the caller can read but that the profile forbids sharing, such as one with issue-level security, produces issue-ineligible; it is returned only to a caller who can already read the issue and never discloses restricted content. If eligibility cannot be determined, the export fails with eligibility-undetermined; uncertainty is never permission. App-level access never authorizes disclosure. An issue that does not satisfy the profile produces profile-mismatch. A field that cannot be resolved to exactly one supported field produces field-unresolved. A field or value that cannot be read produces field-unreadable. A failed export never returns a partial document.",
       "paramStructure": "by-name",
       "params": [
         {
@@ -23,6 +23,19 @@
         "name": "Workdown document",
         "schema": { "type": "string", "minLength": 1 }
       },
+      "errors": [
+        { "code": -32602, "message": "Invalid params" },
+        { "code": -32001, "message": "Forbidden" },
+        { "code": -32002, "message": "Profile mismatch" },
+        { "code": -32003, "message": "Field unresolved" },
+        { "code": -32004, "message": "Field unreadable" },
+        { "code": -32005, "message": "Issue ineligible" },
+        {
+          "code": -32006,
+          "message": "Eligibility undetermined"
+        }
+      ],
+      "x-retryable-errors": [-32004, -32006],
       "x-forge-ahead": {
         "web": true,
         "execution": "asUser",

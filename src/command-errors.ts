@@ -14,4 +14,11 @@ export const commandErrors = {
   "field-unresolved": { title: "Field unresolved", code: -32003 },
   /** A field or its value could not be read (authorization, request or incomplete response). May be transient. */
   "field-unreadable": { title: "Field unreadable", code: -32004 },
+  /** The caller can read the issue, but the profile forbids sharing it (for example issue-level security). Not retryable. */
+  "issue-ineligible": { title: "Issue ineligible", code: -32005 },
+  /** Eligibility could not be determined. Treated as failure, never permission. May be transient. */
+  "eligibility-undetermined": {
+    title: "Eligibility undetermined",
+    code: -32006,
+  },
 } as const satisfies Record<string, CatalogProblemDefinition>;
