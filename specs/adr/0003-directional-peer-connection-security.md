@@ -140,8 +140,12 @@ eligible. Pin the complete endpoint after admin-approved pairing; forbid user
 info, fragments, query credentials, alternate ports, redirects, private/local
 addresses, and arbitrary callback URLs. Authenticate before using any supplied
 callback descriptor. Verify actual generated URL forms and required outbound
-permissions on two approved installations before enabling peer calls; do not
-substitute a permissive wildcard or trust a string suffix check. SDK-generated
+permissions on the existing approved installation; do not substitute a
+permissive wildcard or trust a string suffix check. Verification policy revision
+approved 2026-11-17: a second installation is not a ticket closure prerequisite.
+Actual remote binding and handshake compatibility remain unverified until
+separately exercised; do not enable unverified operational peer traffic or
+weaken any endpoint/authentication check to accommodate single-site testing. SDK-generated
 local URLs are stable per module, app, site, product, and environment, but that
 does not authenticate a supplied remote URL or prove remote installation ID.
 
@@ -252,9 +256,17 @@ Tickets 10–12 must use the already approved business Command, JSON-RPC, and
 deployed peer seams, one red/green behavior at a time. Cover wrong admin/site,
 wrong direction, body tampering, expired/replayed invitations and requests,
 conflicting retries, missing audit acknowledgment, terminal-state races, and
-unreachable-peer status. Two deployed installations must verify authenticated
-pairing and rejection as well as successful transfer. Never put real bundles
-or endpoint URLs in fixtures or committed evidence.
+unreachable-peer status. Under the verification policy revision approved
+2026-11-17, use isolated local peer identities for these cases and the existing
+installation for targeted authentication, runtime, storage, and endpoint checks.
+Never bypass installation binding or add test-only production Commands. If a
+peer case cannot enter the real boundary safely on one installation, retain
+local evidence and explicitly mark the remote property unverified. Actual
+inter-installation pairing/transfer is a separate scenario requiring a named
+residual risk, expected signal/cost, and user approval, not a repeated ticket
+closure gate. This changes evidence requirements, not the trust model or
+operational clearance. Never put real bundles or endpoint URLs in fixtures or
+committed evidence.
 
 Required before implementation can be called complete:
 

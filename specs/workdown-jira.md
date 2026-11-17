@@ -190,9 +190,12 @@ comparison only, not a portable mapping or an implementation constant.
 
 The following verification gates remain open for implementation acceptance testing:
 
-- Cross-site equivalence: compare independently configured sites with different
-  field IDs to verify that `stableId: sfid:jira-software:start-date` uniquely
-  identifies the semantic Start date field across installations.
+- Start date portability and integration (ticket 04; revised by user approval
+  2026-11-17): retain local equivalent-content fixtures with different field IDs,
+  and verify the installed export on one approved site against a known populated
+  Start date. A second site is not required. Record the project type exercised;
+  cover both types on the same site where practical, or explicitly retain the
+  untested type as a compatibility limitation rather than claim coverage.
 - Parent relationship completeness: extend system-parent examples to verify
   pagination and complete direct-child enumeration under the approved permission
   boundary for both company-managed and team-managed projects.
@@ -259,23 +262,80 @@ Synthetic fixture files with different custom IDs produce identical bytes when
 site/issue identity and all semantic data are held constant. Actual different
 sites intentionally produce different `source_id` values.
 
-**Cloud evidence pending:** No ticket 04 deployment, installation upgrade,
-two-site run, or company-managed/team-managed coverage has occurred. The
-project-filtered field-search response is treated as authoritative only under
-the current Jira-admin development gate; this remains a runtime verification
-hypothesis, not proof of visibility completeness for general sharing callers.
-The endpoint documents classic-project coverage; if a team-managed run omits a
-configured field or otherwise contradicts this mapping, stop and revise the
-profile rather than introduce a name-based fallback. A syntactically complete
-response alone does not establish universal project-type coverage.
+**Current status — complete 2026-11-17:** The user reported development 3.3.0
+deployed and the installation on one-atlas-devb.atlassian.net current. The
+subsequent authorized structured deployed suite passed all three tests in
+12.10 seconds (exit 0): authenticated discovery, an exact populated Start date
+export, and an explicit Start date omission export. Both exports passed document
+validation, issue-key matching, and the metadata disclosure allowlist. No issue
+keys, dates, documents, credentials, or private endpoint URLs were printed.
+Latest local `npm run check` passes (114 tests; 11.4 kB / 32 kB; Forge lint clean).
+This satisfies ticket 04's revised single-site acceptance gate.
 
-The deployed test now checks that export metadata stays within the allowlist.
-For each approved site/project run, choose an Epic with a known configured Start
-date and provide `WORKDOWN_TEST_EXPECTED_START_DATE` in the local environment to
-assert its exact value without printing the document. Run the existing deployed
-test separately for both site URLs/credentials; collect sanitized evidence of
-different field IDs and both project types before marking ticket 04 done.
-This optional assertion variable is not a Forge runtime secret or manifest input.
+The scenario configuration declares company-managed for the populated-date case
+and team-managed for the omission case. Project-type labels are operator supplied,
+not independently verified by the harness. The omission case does not establish
+populated Start date support for all team-managed projects, and one site does
+not establish universal compatibility. Cross-ID portability remains locally
+tested. The Jira ADMINISTER development gate remains; non-admin authorization
+and issue security are ticket 05 work. No storage or publication is claimed.
+
+Earlier failed runs and local-only statuses below are historical and superseded
+by this passing run; they are retained to explain the corrections.
+
+**Revised cloud gate — approved 2026-11-17:** One approved site is sufficient.
+Existing local fixtures exercise equivalent content with different field IDs;
+a second installation is not required. Choose an Epic with a known populated
+Start date and declare its key, project type, and independently known
+`expected.start_date` in `test/deployed.local.json`. The structured scenario
+replaces issue-selection and expected-date environment variables. Every scenario
+requires an expectation: a date asserts its exact value; null requires omission.
+Ticket 04 acceptance needs at least one populated-date scenario, not only null
+cases. The deployed test must also pass document validation, key matching, and
+the disclosure allowlist check without printing the document. Only connection
+details and credentials remain in SecretSpec; scenario data is Git-ignored.
+
+Record the project type exercised and sanitized results here. Exercise both
+company-managed and team-managed Epics on the same site where practical;
+otherwise explicitly record the unverified type as a compatibility limitation.
+The project-filtered field-search response is treated as authoritative only
+under the current Jira-admin development gate, not as proof of visibility
+completeness for general sharing callers. The endpoint documents classic-project
+coverage; if a run omits a configured field or contradicts this mapping, stop
+and revise the profile rather than accept silent omission or introduce a
+name-based fallback. A syntactically complete response alone does not establish
+universal project-type coverage. Non-admin authorization remains ticket 05 work.
+
+### Schema-less system fields: diagnosed and corrected locally (2026-11-17)
+
+The user's structured deployed run passed discovery but both export scenarios
+returned -32004. A read-only diagnostic using the configured caller found both
+issues readable (HTTP 200), but the global and project-filtered field catalogs
+contained unrelated system entries without `schema`. The catalog validator
+rejected those entries before Start date resolution. Only status and shape
+summaries were emitted; no credentials, issue content, or endpoint URLs were
+recorded. This establishes a metadata-validation blocker, not the absence of
+additional downstream failures.
+
+The local correction permits omitted schemas on unrelated system fields while
+retaining custom-field schema checks and strict Start date candidate validation.
+A paginated regression reproduces the original failure and now verifies the
+exported date. `npm run check` passes (114 tests; 11.4 kB / 32 kB). This correction
+has not been deployed or cloud-verified; rerun the structured deployed scenarios
+after an approved deployment before claiming either project's export succeeds.
+
+### Authorized ticket 04 installed-app rerun (2026-11-17)
+
+The configured SecretSpec-backed deployed test was run with user approval.
+One test failed in 6.82 seconds: `workdown.export` returned JSON-RPC -32004
+(`field-unreadable`). Response bodies, documents, credentials, and URLs were
+suppressed. The expected-date environment variable was unset; no positive
+Start date assertion or project-type coverage was established. The public
+error code does not identify the failing metadata/value read; root cause is
+not yet established. This is a failed cloud smoke, not ticket acceptance.
+No deployment, installation, or live-data writes were performed. Diagnose the
+read failure and configure an independently known populated expected date
+before rerunning the single-site acceptance gate.
 
 ### First ticket 04 cloud failure and correction (2026-11-16)
 

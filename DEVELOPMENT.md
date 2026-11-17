@@ -112,7 +112,9 @@ is no longer anonymous. The application contract is unchanged.
   credential, emits the two core golden documents, and validates Frontmatter
   against `src/workdown-frontmatter.schema.json` plus safe YAML and identity
   invariants. Ticket 04 adds the scalar disclosure allowlist and semantic Start
-  date resolution; its two-site/project-type cloud verification is pending.
+  date resolution; its revised single-site cloud gate passed on development
+  3.3.0 (2026-11-17): discovery and both structured export scenarios passed,
+  including an exact populated Start date and explicit omission.
   Rich ADF fails closed until ticket 07; eligibility and children remain tickets
   05–06. No data is stored or published.
 - Start date discovery paginates `field/search?expand=stableId`, checks the
@@ -123,12 +125,17 @@ is no longer anonymous. The application contract is unchanged.
   mappings fail with `field-unresolved` (-32003), without returning field names.
   No extra OAuth scopes or egress destinations are declared. Catalog work is
   bounded to 1000 pages per enumeration and fails rather than returning partial
-  results. This local implementation does not prove team-managed coverage; see
-  the ticket 04 evidence section of `specs/workdown-jira.md`.
-- The deployed test can assert a known Start date via the local optional
-  `WORKDOWN_TEST_EXPECTED_START_DATE` environment variable. Run it separately
-  with each approved site's configured inputs and a known populated Epic;
-  ticket 04 requires two sites with different field IDs and both project types.
+  results. The passing scenarios declare company-managed and team-managed
+  project types; these are operator-supplied labels, not harness-verified types.
+  The team-managed omission case does not establish universal populated-date
+  support; see the ticket 04 evidence in `specs/workdown-jira.md`.
+- For ticket 04 acceptance, configure a named issue in `test/deployed.local.json`
+  with a known populated `expected.start_date` and run the deployed tests on
+  one approved site. Every issue requires an explicit expectation; `null`
+  requires omission and does not prove populated-date export. Existing local
+  fixtures exercise different field IDs; no second site is required. Record
+  the project type exercised, cover both types on the same site where practical,
+  and explicitly record any unverified type as a compatibility limitation.
 - Every request, including discovery, needs `Authorization: Basic BASE64`, where
   BASE64 encodes `email:api-token`. Use a scoped Jira API token with access to
   the identity, permissions, issue, and server-info reads below. The exact
@@ -180,9 +187,12 @@ is no longer anonymous. The application contract is unchanged.
   `npm install` outside the sandbox to update the lockfile before release.
   No dependency installation or lockfile editing was performed by the agent.
 
-Supply optional local variables declared in `secretspec.toml`:
-`WORKDOWN_RPC_URL`, `WORKDOWN_TEST_EMAIL`, `WORKDOWN_TEST_API_TOKEN`, and
-`WORKDOWN_TEST_ISSUE` (a readable Epic with empty or plain-text description).
+Supply the local connection inputs declared in `secretspec.toml`:
+`WORKDOWN_RPC_URL`, `WORKDOWN_TEST_EMAIL`, and `WORKDOWN_TEST_API_TOKEN`.
+Configure readable Epics with empty or plain-text descriptions and their
+independent expectations in `test/deployed.local.json` as described below.
+The old `WORKDOWN_TEST_ISSUE` and expected-date environment inputs are no longer
+read; any previously stored issue value can be retired separately.
 Run `secretspec run --scope '' -- npm run test:deployed` in a trusted terminal
 only after approved deployment and installation upgrade. The test requires
 unauthenticated discovery to fail, validates authenticated discovery, and
@@ -304,8 +314,8 @@ backbone's webtrigger adapter checks an `Authorization` credential on every
 request. The development loop uses a Jira API token and accepts a caller who
 is an active Atlassian user with Jira's `ADMINISTER` global permission. This
 is the development-loop model, not end-user authentication. The exact header
-format and all four local variables are documented above; the three credential
-declarations below are excerpts, not the complete test configuration.
+format is documented above. SecretSpec holds only the three connection inputs;
+issue identities and expected values belong in the local scenario file.
 
 | Name                      | What it is                                              | Storage role                                          |
 | ------------------------- | ------------------------------------------------------- | ----------------------------------------------------- |
@@ -377,6 +387,38 @@ recording or agent capture while you enter secrets.
    [user-provider guide](node_modules/fence-rider/docs/how-to/configure-user-providers.md)
    and [app secrets guide](node_modules/fence-rider/docs/how-to/configure-app-secrets.md).
 
+### Configure issue scenarios
+
+Copy `test/deployed.example.json` to `test/deployed.local.json` and use the
+checked-in public dataset values or replace them with independently known test
+data. The example's real issue keys are from a public, well-known dataset and
+are intentionally retained. The local file is Git-ignored; never commit private
+issue identities, content, or credentials. No local scenario file is created
+automatically. Keep aliases generic because aliases and declared project types
+appear in test names.
+
+Each named entry under `issues` contains `key`, `projectType` (company-managed
+or team-managed), and `expected.start_date`. A date asserts the exact exported
+value; `null` asserts that the field is omitted. Missing expectations, invalid
+calendar dates, unknown properties, and empty issue sets fail configuration
+validation before any network request. Remove illustrative scenarios that do
+not apply; two project types are not mandatory. Declared project types are
+operator-supplied coverage labels, not independently verified by the harness.
+
+Maintain expectations independently of the export under test; do not generate
+them from its output. Add fields to the typed configuration and its validator
+when a subsequent ticket needs them, rather than adding environment variables.
+`test/deployed-harness.ts` provides the validated loader and shared authenticated
+RPC helper. Local harness tests use synthetic inputs and make no cloud calls.
+
+The deployed suite checks discovery once and exports each scenario separately,
+including document validity, allowlist, issue key, and Start date expectation.
+Failures suppress credentials, response bodies, and documents; scenario aliases
+and assertion labels identify the failing check. These read-only tests neither
+provision nor modify issues. The earlier `field-unreadable` failure was resolved
+by the catalog-validation correction, not by the harness; the subsequent 3.3.0
+structured deployed run passed all three tests.
+
 ### Use them
 
 Check that the names resolve without printing values:
@@ -400,9 +442,15 @@ to run it through `secretspec run` and keep the output free of credentials.
 
 API tokens expire: create a new one and `secretspec set` it again. A webtrigger
 URL changes only if it is recreated or the module key or `urlFormat` changes. A
-second development site (needed for cross-site tickets) needs its own URL and
-credentials; choose separate names or a separate SecretSpec profile when it
-exists.
+second development site, if separately approved for a named residual integration
+risk, needs its own URL and credentials; choose separate names or a separate
+SecretSpec profile when it exists. It is not a blanket ticket prerequisite.
+Default to local isolated-peer tests plus targeted checks on the existing
+installation; distinguish those from actual inter-installation evidence. Never
+bypass authentication or installation binding for a test. If the approved boundary
+cannot safely exercise a remote case on one installation, record that case as
+unverified rather than add a test-only production Command. See the testing
+decisions in `specs/supplychain-graph.md`.
 
 ## Repository layout
 
