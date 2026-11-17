@@ -242,6 +242,19 @@ describe("workdown.export", () => {
     expect(response.result).toBeTypeOf("string");
     expect(response.result).not.toContain("start_date:");
   });
+  it("ignores unrelated schema-less system fields across catalog pages", async () => {
+    const response = await call(
+      { ...epic, fields: { ...epic.fields, [startField.id]: "2026-11-17" } },
+      undefined,
+      200,
+      [{ id: "systemWithoutSchema" }, startField],
+    );
+    expect(response.result).toBeTypeOf("string");
+    const { parse } = await import("yaml");
+    expect(parse(response.result.split("---\n")[1]).start_date).toBe(
+      "2026-11-17",
+    );
+  });
   it("does not treat a missing requested Start date value as unset", async () => {
     expect((await call(epic, undefined, 200, [startField])).error.code).toBe(
       -32004,

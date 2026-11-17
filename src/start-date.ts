@@ -3,7 +3,7 @@ import { type CommandContext, jiraGet } from "./jira";
 type Field = {
   id: string;
   stableId?: string;
-  schema: { type: string; custom?: string };
+  schema?: { type: string; custom?: string };
 };
 type Resolution = {
   id?: string;
@@ -45,8 +45,9 @@ async function catalog(
         (field) =>
           !field ||
           typeof field.id !== "string" ||
-          !field.schema ||
-          typeof field.schema.type !== "string",
+          ((field.id.startsWith("customfield_") ||
+            field.schema !== undefined) &&
+            (!field.schema || typeof field.schema.type !== "string")),
       )
     )
       return;
@@ -85,7 +86,7 @@ export async function resolveStartDate(
       matches.length !== 1 ||
       !field ||
       !/^customfield_\d+$/.test(field.id) ||
-      field.schema.type !== "date" ||
+      field.schema?.type !== "date" ||
       field.schema.custom !==
         "com.atlassian.jira.plugin.system.customfieldtypes:datepicker"
     )
@@ -109,7 +110,7 @@ export async function resolveStartDate(
     return candidates.length === 1 &&
       candidate?.id === field.id &&
       candidate.stableId === field.stableId &&
-      candidate.schema.type === field.schema.type &&
+      candidate.schema?.type === field.schema.type &&
       candidate.schema.custom === field.schema.custom
       ? { id: field.id }
       : { error: "field-unresolved" };
