@@ -4,7 +4,7 @@ import contract from "../src/openrpc.json";
 const document = {
   ...contract,
   methods: contract.methods.map(
-    ({ "x-forge-ahead": _policy, ...method }) => method,
+    ({ "x-forge-ahead": _policy, examples: _examples, ...method }) => method,
   ),
 };
 

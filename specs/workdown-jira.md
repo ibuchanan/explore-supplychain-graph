@@ -506,6 +506,57 @@ issues, 18 subtasks), all company-managed. The visible project catalog contained
 unverified, not passing evidence. Runtime fail-closed rules and active local
 security tests are unchanged. Other outstanding acceptance gates remain as above.
 
+### Ticket 05 closed with recorded gaps (user decision 2026-11-18)
+
+The user closed ticket 05 as sufficiently complete and no longer a blocker for
+ticket 06. This supersedes "remains open" and "remains blocked" above. Closure
+is a scope decision, not new evidence. Still unverified, and not cleared for
+operational use: secured-Epic and unreadable-Epic installed-app behavior,
+team-managed secured detection (such exports keep failing closed as
+`eligibility-undetermined`), and eligibility-change event behavior.
+
+### Direct-child export implementation (ticket 06, 2026-11-18)
+
+The export now enumerates `GET /rest/api/3/search/jql` with bounded JQL
+`parent = <immutable Epic ID>`, the caller's verified credential, an explicit
+summary-field allowlist, and `failFast=true`. It follows continuation tokens
+until an explicit `isLast: true`; absent or contradictory completion metadata,
+repeated tokens, warnings (including possible truncation), failed responses,
+and invalid child values fail the entire candidate as `children-unreadable`
+(-32007). Page size is a request hint, never evidence of completion.
+The endpoint's permission filtering omits unreadable items; no extra app-level
+read or inferred count is used. Search is eventually consistent, not an atomic
+snapshot: recent changes or concurrent reparenting are not guaranteed visible.
+
+Readable secured children are silently excluded. Other candidates must have
+explicit null security, a verified company-managed project, the expected system
+parent, and a non-subtask issue type. Uncertain eligibility fails the candidate;
+team-managed detection remains gated as recorded in ticket 05. Included children
+sort by native issue ID lexically, carry only the child-record allowlist, and
+have matching ordered `sources` records and a canonical Children table. Child
+modification times and descriptions cannot affect canonical bytes. Epic exports
+omit `parent`; the format validator accepts standalone parent records and rejects
+primary/parent/child identity collisions and table/metadata disagreements.
+
+Evidence: local authenticated-Command tests cover zero, one and several children,
+pagination splits/order, completed status/resolution, escaping, secured-item
+omission without log disclosures, malformed/failed pages, and invalid identities.
+The existing deployed harness now requires independently supplied ordered child
+keys (`expected.children`, including an explicit empty list) for success cases.
+No new app endpoint, manifest, scope, egress, storage, or dependency change is needed.
+
+Not yet verified for ticket 06: the implemented enhanced-search pagination and
+security payload on the installed app, a deployed child export, and sanitized
+cloud log readback. Prior system-parent observations above establish positive
+relationship examples in both project types, not new runtime evidence. Deployment
+and installation are not authorized by this implementation task. Existing local
+cloud scenario files require independent child expectations before the suite can
+run; do not derive expectations from the export being checked. Missing standard
+dataset cases remain explicit gaps, not a requirement to manufacture test data.
+
+API reference inspected for the implementation:
+[Jira enhanced JQL search](https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-search/#api-rest-api-3-search-jql-get).
+
 ### Deterministic generation and failure behavior
 
 - Serialize fields in schema-table order and record fields in their defined

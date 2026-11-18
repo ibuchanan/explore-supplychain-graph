@@ -8,7 +8,7 @@ export interface DeployedScenarios {
       key: string;
       projectType: "company-managed" | "team-managed";
       expected:
-        | { start_date: string | null }
+        | { start_date: string | null; children: string[] }
         | { errorCode: -32001 | -32005 | -32006 };
     }
   >;
@@ -33,8 +33,30 @@ const validScenarios = new Ajv().compile<DeployedScenarios>({
           expected: {
             type: "object",
             additionalProperties: false,
-            oneOf: [{ required: ["start_date"] }, { required: ["errorCode"] }],
+            oneOf: [
+              {
+                required: ["start_date", "children"],
+                not: { required: ["errorCode"] },
+              },
+              {
+                required: ["errorCode"],
+                not: {
+                  anyOf: [
+                    { required: ["start_date"] },
+                    { required: ["children"] },
+                  ],
+                },
+              },
+            ],
             properties: {
+              children: {
+                type: "array",
+                uniqueItems: true,
+                items: {
+                  type: "string",
+                  pattern: "^[A-Z][A-Z0-9_]*-[1-9][0-9]*$",
+                },
+              },
               errorCode: { enum: [-32001, -32005, -32006] },
               start_date: {
                 anyOf: [
@@ -61,7 +83,7 @@ export function parseDeployedScenarios(text: string): DeployedScenarios {
   }
   if (!validScenarios(value))
     throw new Error(
-      "Invalid deployed scenarios: require named issues with key, projectType, and expected.start_date (date or null) or expected.errorCode (-32001, -32005, -32006); content suppressed",
+      "Invalid deployed scenarios: require named issues with key, projectType, and expected.start_date (date or null) plus ordered expected.children, or expected.errorCode (-32001, -32005, -32006); content suppressed",
     );
   for (const issue of Object.values(value.issues)) {
     if (!("start_date" in issue.expected)) continue;

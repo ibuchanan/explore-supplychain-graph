@@ -7,7 +7,7 @@ const scenario = (start_date: unknown = "2026-11-17") => ({
     epic: {
       key: "EXAMPLE-123",
       projectType: "company-managed",
-      expected: { start_date },
+      expected: { start_date, children: [] },
     },
   },
 });
@@ -57,10 +57,29 @@ it.each([
   },
 );
 
+it.each([
+  { start_date: null },
+  { start_date: null, children: ["EXAMPLE-1", "EXAMPLE-1"] },
+  { start_date: null, children: ["invalid"] },
+  { errorCode: -32006, children: [] },
+])(
+  "rejects missing or invalid child expectations before cloud calls (case %#)",
+  (expected) => {
+    const value = scenario();
+    expect(() =>
+      parseDeployedScenarios(
+        JSON.stringify({
+          issues: { epic: { ...value.issues.epic, expected } },
+        }),
+      ),
+    ).toThrow(/content suppressed/);
+  },
+);
+
 it("loads explicit eligibility failure expectations without a Start date", () => {
   const value = scenario();
   const text = JSON.stringify(value).replace(
-    '"start_date":"2026-11-17"',
+    '"start_date":"2026-11-17","children":[]',
     '"errorCode":-32006',
   );
   expect(parseDeployedScenarios(text).issues["epic"]?.expected).toEqual({

@@ -2,8 +2,10 @@ import { readFileSync } from "node:fs";
 import { ok } from "@forge-ahead/errors";
 import { createWebDispatcher } from "@forge-ahead/rpc";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { parse, stringify } from "yaml";
 import { runSync } from "../src/index";
 import { options } from "../src/rpc";
+import { validateWorkdown } from "../src/workdown-validation";
 
 const cloudId = "00000000-0000-4000-8000-000000000001";
 const epic = {
@@ -65,6 +67,8 @@ async function call(
         values: catalog.slice(startAt, startAt + 1),
       });
     }
+    if (url.includes("/search/jql?"))
+      return Response.json({ isLast: true, issues: [] });
     if (url.includes("/issue/")) return Response.json(issue, { status });
     if (url.endsWith("/serverInfo"))
       return Response.json({ baseUrl: "https://source.example.com" });
@@ -100,7 +104,326 @@ const startField = {
   },
 };
 
+const child = {
+  id: "10043",
+  key: "DEMO-43",
+  fields: {
+    summary: "Define availability response",
+    issuetype: { name: "Story", subtask: false },
+    parent: { id: epic.id },
+    project: { simplified: false },
+    security: null,
+    status: null,
+    resolution: null,
+  },
+};
+
 describe("workdown.export", () => {
+  it("exports one direct child with matching sources and an escaped Children table", async () => {
+    const response = await call(epic, undefined, 200, [], cloudId, (url) =>
+      url.pathname.endsWith("/search/jql")
+        ? Response.json({ isLast: true, issues: [child] })
+        : undefined,
+    );
+    expect(response.error).toBeUndefined();
+    const metadata = parse(response.result.split("---\n")[1]);
+    expect(metadata.children).toEqual([
+      {
+        source_id: `ari:cloud:jira:${cloudId}:issue/10043`,
+        title: "Define availability response",
+        resource: "https://source.example.com/browse/DEMO-43",
+        work_type: "Story",
+        key: "DEMO-43",
+      },
+    ]);
+    expect(metadata).not.toHaveProperty("parent");
+    expect(metadata.sources[1]).toEqual({
+      id: `ari:cloud:jira:${cloudId}:issue/10043`,
+      resource: "https://source.example.com/browse/DEMO-43",
+      title: "Define availability response",
+    });
+    expect(response.result).toContain(
+      "\n## Children\n\n| Work item | Type | Status | Resolution |\n| --- | --- | --- | --- |\n| [DEMO\\-43: Define availability response](https://source.example.com/browse/DEMO-43) | Story | — | — |\n",
+    );
+    expect(validateWorkdown(response.result)).toBe(true);
+  });
+  it("reads every page as the caller and sorts completed children by lexical native ID", async () => {
+    const first = {
+      ...child,
+      id: "9",
+      key: "DEMO-9",
+      fields: {
+        ...child.fields,
+        summary: "Pipe | <text>",
+        status: { name: "Done", statusCategory: { key: "done" } },
+        resolution: { name: "Fixed" },
+        description: "private-description",
+        updated: "private-updated",
+        comments: ["private-comment"],
+      },
+    };
+    const second = { ...child, id: "10", key: "DEMO-10" };
+    const exportPages = async (pages: unknown[][]) => {
+      const tokens: (string | null)[] = [];
+      const response = await call(epic, undefined, 200, [], cloudId, (url) => {
+        if (!url.pathname.endsWith("/search/jql")) return undefined;
+        expect(url.searchParams.get("jql")).toBe("parent = 10042");
+        expect(url.searchParams.get("failFast")).toBe("true");
+        expect(url.searchParams.get("fields")).toBe(
+          "summary,issuetype,status,resolution,parent,project,security",
+        );
+        tokens.push(url.searchParams.get("nextPageToken"));
+        const index = tokens.length - 1;
+        return Response.json({
+          issues: pages[index],
+          isLast: index === pages.length - 1,
+          ...(index < pages.length - 1
+            ? { nextPageToken: `page-${index + 1}` }
+            : {}),
+        });
+      });
+      expect(response.error).toBeUndefined();
+      return { ...response, tokens };
+    };
+    const paged = await exportPages([[first], [second]]);
+    const unpaged = await exportPages([
+      [
+        second,
+        {
+          ...first,
+          fields: { ...first.fields, updated: "other-private-update" },
+        },
+      ],
+    ]);
+    expect(paged.tokens).toEqual([null, "page-1"]);
+    expect(paged.result).toBe(unpaged.result);
+    const metadata = parse(paged.result.split("---\n")[1]);
+    expect(metadata.children.map((item: { key: string }) => item.key)).toEqual([
+      "DEMO-10",
+      "DEMO-9",
+    ]);
+    expect(metadata.children[1].work_status).toEqual({
+      name: "Done",
+      category: "done",
+    });
+    expect(metadata.children[1].resolution).toBe("Fixed");
+    expect(paged.result).not.toContain("private-");
+    expect(paged.result).toContain("Pipe \\| \\<text\\>");
+    expect(validateWorkdown(paged.result)).toBe(true);
+  });
+  it.each([
+    { issues: [child], isLast: false },
+    { issues: [child] },
+    { issues: [child], isLast: true, nextPageToken: "contradiction" },
+    {
+      issues: [child],
+      isLast: true,
+      warnings: [{ message: "private-truncation" }],
+    },
+    { issues: [child], isLast: "true" },
+    { issues: null, isLast: true },
+  ])(
+    "fails the whole export on incomplete or ambiguous child pagination (case %#)",
+    async (page) => {
+      const response = await call(epic, undefined, 200, [], cloudId, (url) =>
+        url.pathname.endsWith("/search/jql") ? Response.json(page) : undefined,
+      );
+      expect(response).toEqual({
+        jsonrpc: "2.0",
+        id: 1,
+        error: { code: -32007, message: "Children unreadable" },
+      });
+    },
+  );
+  it.each(["failed-page", "repeated-token", "bad-json", "network"])(
+    "returns no partial document after %s",
+    async (failure) => {
+      let pages = 0;
+      const response = await call(epic, undefined, 200, [], cloudId, (url) => {
+        if (!url.pathname.endsWith("/search/jql")) return undefined;
+        if (++pages === 1)
+          return Response.json({
+            issues: [child],
+            isLast: false,
+            nextPageToken: "again",
+          });
+        if (failure === "network") throw new Error("private-network-details");
+        if (failure === "bad-json") return new Response("not json");
+        if (failure === "failed-page")
+          return new Response("private-upstream", { status: 403 });
+        if (pages > 2) throw new Error("test stops unbounded pagination");
+        return Response.json({
+          issues: [],
+          isLast: false,
+          nextPageToken: "again",
+        });
+      });
+      expect(response).toEqual({
+        jsonrpc: "2.0",
+        id: 1,
+        error: { code: -32007, message: "Children unreadable" },
+      });
+      expect(pages).toBe(2);
+    },
+  );
+  it("silently excludes secured children without exposing their data or counts", async () => {
+    const logs = vi.spyOn(console, "info").mockImplementation(() => {});
+    try {
+      const response = await call(epic, undefined, 200, [], cloudId, (url) =>
+        url.pathname.endsWith("/search/jql")
+          ? Response.json({
+              isLast: true,
+              issues: [
+                {
+                  ...child,
+                  id: "10099",
+                  key: "PRIVATE-99",
+                  fields: {
+                    security: { id: "123", name: "private-level" },
+                    summary: "private-summary",
+                  },
+                },
+              ],
+            })
+          : undefined,
+      );
+      expect(response.error).toBeUndefined();
+      expect(response.result).toBe(
+        readFileSync(
+          new URL(
+            "./fixtures/workdown-export/epic-empty-description.workdown",
+            import.meta.url,
+          ),
+          "utf8",
+        ),
+      );
+      expect(JSON.stringify(logs.mock.calls)).not.toContain("private-");
+      expect(JSON.stringify(logs.mock.calls)).not.toContain("PRIVATE-99");
+    } finally {
+      logs.mockRestore();
+    }
+  });
+  it.each([
+    { security: undefined },
+    { security: {} },
+    { project: { simplified: true } },
+    { parent: { id: "99999" } },
+    { parent: undefined },
+    { issuetype: { name: "Subtask", subtask: true } },
+    { summary: "" },
+    { summary: "two\nlines" },
+    { status: undefined },
+    { status: { name: 123 } },
+    { resolution: {} },
+  ])(
+    "fails closed on an indeterminate or invalid child (case %#)",
+    async (fields) => {
+      const response = await call(epic, undefined, 200, [], cloudId, (url) =>
+        url.pathname.endsWith("/search/jql")
+          ? Response.json({
+              isLast: true,
+              issues: [{ ...child, fields: { ...child.fields, ...fields } }],
+            })
+          : undefined,
+      );
+      expect(response).toEqual({
+        jsonrpc: "2.0",
+        id: 1,
+        error: { code: -32007, message: "Children unreadable" },
+      });
+    },
+  );
+  it.each([
+    [child, child],
+    [{ ...child, id: epic.id }],
+    [{ ...child, id: "invalid" }],
+  ])(
+    "rejects duplicate, primary-equal or invalid child identities (case %#)",
+    async (...issues) => {
+      const response = await call(epic, undefined, 200, [], cloudId, (url) =>
+        url.pathname.endsWith("/search/jql")
+          ? Response.json({ isLast: true, issues })
+          : undefined,
+      );
+      expect(response).toEqual({
+        jsonrpc: "2.0",
+        id: 1,
+        error: { code: -32007, message: "Children unreadable" },
+      });
+    },
+  );
+  it("validates standalone parent records and rejects identity or Children table mismatches", async () => {
+    const response = await call(epic, undefined, 200, [], cloudId, (url) =>
+      url.pathname.endsWith("/search/jql")
+        ? Response.json({ isLast: true, issues: [child] })
+        : undefined,
+    );
+    const metadata = parse(response.result.split("---\n")[1]);
+    const body = response.result.slice(
+      response.result.indexOf("\n---\n", 4) + 5,
+    );
+    const document = (data: unknown, content = body) =>
+      `---\n${stringify(data, { defaultStringType: "QUOTE_DOUBLE", defaultKeyType: "PLAIN" })}---\n${content}`;
+    expect(validateWorkdown(document(metadata))).toBe(true);
+    expect(
+      validateWorkdown(
+        document(metadata, body.replace(" | Story |", " | Bug |")),
+      ),
+    ).toBe(false);
+    expect(
+      validateWorkdown(
+        document(metadata, body.slice(0, body.indexOf("\n## Children")) + "\n"),
+      ),
+    ).toBe(false);
+    expect(
+      validateWorkdown(document(metadata, `${body}\n## Children\n\nextra\n`)),
+    ).toBe(false);
+    const standalone = {
+      ...metadata,
+      children: undefined,
+      sources: [metadata.sources[0]],
+      parent: metadata.children[0],
+    };
+    const noTable =
+      body.slice(0, body.indexOf("\n## Children")).trimEnd() + "\n";
+    delete standalone.children;
+    expect(validateWorkdown(document(standalone, noTable))).toBe(true);
+    expect(validateWorkdown(document(standalone))).toBe(false);
+    expect(
+      validateWorkdown(
+        document(
+          {
+            ...standalone,
+            parent: { ...standalone.parent, source_id: metadata.source_id },
+          },
+          noTable,
+        ),
+      ),
+    ).toBe(false);
+    expect(
+      validateWorkdown(document({ ...metadata, parent: metadata.children[0] })),
+    ).toBe(false);
+    expect(
+      validateWorkdown(
+        document({
+          ...metadata,
+          children: [metadata.children[0], metadata.children[0]],
+          sources: [...metadata.sources, metadata.sources[1]],
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      validateWorkdown(
+        document({
+          ...metadata,
+          sources: [
+            metadata.sources[0],
+            { ...metadata.sources[1], title: "Wrong source" },
+          ],
+        }),
+      ),
+    ).toBe(false);
+  });
   it("resolves a positive Start date match when unrelated fields omit stableId", async () => {
     const response = await call(
       { ...epic, fields: { ...epic.fields, [startField.id]: "2026-11-20" } },

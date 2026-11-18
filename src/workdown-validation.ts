@@ -1,5 +1,6 @@
 import { isAlias, isMap, isScalar, isSeq, parseDocument, visit } from "yaml";
 import { validateFrontmatter } from "./generated/frontmatter.js";
+import { childrenTable } from "./workdown-children";
 
 export function validateWorkdown(text: unknown): boolean {
   if (
@@ -113,6 +114,34 @@ export function validateWorkdown(text: unknown): boolean {
         .startsWith(`\n# ${escapeTitle(data.title)}\n\n## Description\n\n`)
     )
       return false;
+    const body = text.slice(end + 5);
+    const sections: number[] = [];
+    let fence: { character: string; length: number } | undefined;
+    let offset = 0;
+    for (const line of body.split("\n")) {
+      const marker = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+      const run = marker?.[1] ?? "";
+      if (fence) {
+        if (
+          run.startsWith(fence.character) &&
+          run.length >= fence.length &&
+          !marker?.[2]?.trim()
+        )
+          fence = undefined;
+      } else if (marker) {
+        fence = { character: run.charAt(0), length: run.length };
+      } else if (/^## Children\s*$/.test(line)) {
+        sections.push(offset);
+      }
+      offset += line.length + 1;
+    }
+    if (children.length) {
+      if (
+        sections.length !== 1 ||
+        body.slice(sections[0]) !== `${childrenTable(children)}\n`
+      )
+        return false;
+    } else if (sections.length) return false;
     return true;
   } catch {
     return false;

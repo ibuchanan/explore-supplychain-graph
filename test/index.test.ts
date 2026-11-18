@@ -52,7 +52,8 @@ describe.each([runSync, runAsync])("authenticated webtrigger", (handler) => {
         expect(JSON.parse(response.body).result).toEqual({
           ...document,
           methods: document.methods.map(
-            ({ "x-forge-ahead": _policy, ...method }) => method,
+            ({ "x-forge-ahead": _policy, examples: _examples, ...method }) =>
+              method,
           ),
         });
     },

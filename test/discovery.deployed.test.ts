@@ -42,7 +42,7 @@ it("authenticates discovery through the deployed Forge webtrigger", async () => 
   const expected = {
     ...contract,
     methods: contract.methods.map(
-      ({ "x-forge-ahead": _policy, ...method }) => method,
+      ({ "x-forge-ahead": _policy, examples: _examples, ...method }) => method,
     ),
   };
   // Boolean assertions avoid dumping private response content on failure.
@@ -94,11 +94,21 @@ for (const [alias, issue] of Object.entries(scenarios.issues)) {
       "due_date",
       "generated",
       "sources",
+      "children",
     ]);
     expect(
       Object.keys(metadata).every((key) => allowed.has(key)),
       "metadata stays within allowlist",
     ).toBe(true);
+    const children = metadata["children"] as { key: string }[] | undefined;
+    expect(
+      isDeepStrictEqual(
+        (children ?? []).map((child) => child.key),
+        issue.expected.children,
+      ),
+      "children match independent scenario in native-ID lexical order",
+    ).toBe(true);
+    expect(Object.hasOwn(metadata, "parent"), "Epic omits parent").toBe(false);
     const expected = issue.expected.start_date;
     expect(
       expected === null

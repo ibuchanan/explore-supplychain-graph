@@ -21,4 +21,6 @@ export const commandErrors = {
     title: "Eligibility undetermined",
     code: -32006,
   },
+  /** The direct-child listing was interrupted or incomplete. Never yields a smaller snapshot. May be transient. */
+  "children-unreadable": { title: "Children unreadable", code: -32007 },
 } as const satisfies Record<string, CatalogProblemDefinition>;

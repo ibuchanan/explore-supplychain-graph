@@ -2,10 +2,15 @@ import { err, ok } from "@forge-ahead/errors";
 import type { HandlerMap } from "./generated/contract";
 import { type CommandContext, jiraGet } from "./jira";
 import { resolveStartDate } from "./start-date";
+import {
+  type Child,
+  childLines,
+  childrenTable,
+  escapeMarkdown,
+  readChildren,
+} from "./workdown-children";
 
 const quote = JSON.stringify;
-const escapeMarkdown = (text: string) =>
-  text.replace(/[\\`*_{}[\]<>()#+!|~>-]/g, "\\$&");
 
 type Node = {
   type: string;
@@ -233,6 +238,12 @@ export const exportWorkdown: HandlerMap<
   const sourceDate = issue.fields.updated.slice(0, 10);
   if (new Date(sourceDate).toISOString().slice(0, 10) !== sourceDate)
     return err("internal-error");
+  let children: Child[];
+  try {
+    children = await readChildren(context, issue.id, new URL(baseUrl).origin);
+  } catch {
+    return err("children-unreadable");
+  }
   const document = [
     "---",
     'format: "workdown"',
@@ -256,6 +267,12 @@ export const exportWorkdown: HandlerMap<
     `    resource: ${quote(resource)}`,
     `    title: ${quote(title)}`,
     `    last_modified: ${quote(updated)}`,
+    ...children.flatMap((child) => [
+      `  - id: ${quote(child.source_id)}`,
+      `    resource: ${quote(child.resource)}`,
+      `    title: ${quote(child.title)}`,
+    ]),
+    ...(children.length ? ["children:", ...children.flatMap(childLines)] : []),
     "---",
     "",
     `# ${escapeMarkdown(title)}`,
@@ -263,6 +280,7 @@ export const exportWorkdown: HandlerMap<
     "## Description",
     "",
     descriptionText(issue.fields.description),
+    ...(children.length ? ["", childrenTable(children)] : []),
     "",
   ].join("\n");
   return ok(document);
