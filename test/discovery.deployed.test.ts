@@ -10,6 +10,30 @@ import { validateOpenRpc } from "./openrpc";
 const scenarios = loadDeployedScenarios();
 const call = createDeployedRpc();
 
+it.skip.each([
+  ["readableSecuredEpic", -32005],
+  ["unreadableEpic", -32001],
+] as const)(
+  "rejects %s without a document (deferred: independently verified Epic fixture unavailable)",
+  async (alias, errorCode) => {
+    const issue = scenarios.issues[alias];
+    if (!issue)
+      throw new Error(
+        "Configure the independently verified Epic scenario before enabling this test",
+      );
+    expect(issue.expected).toEqual({ errorCode });
+    const response = await call(
+      "workdown.export",
+      { profile: "jira-epic", issue: issue.key },
+      true,
+      errorCode,
+    );
+    expect(response.status).toBe(200);
+    expect(response.errorCode).toBe(errorCode);
+    expect(response).not.toHaveProperty("result");
+  },
+);
+
 it("authenticates discovery through the deployed Forge webtrigger", async () => {
   expect((await call("rpc.discover", {}, false)).status).toBe(401);
   const discovery = await call("rpc.discover", {});

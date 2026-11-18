@@ -471,6 +471,41 @@ No deployment, installation, scopes, egress or manifest changes were made.
 Ticket 05 remains incomplete and does not unblock ticket 06 until the remaining
 acceptance evidence is recorded after separately approved release work.
 
+### Ticket 05 installed-app rerun (2026-11-18)
+
+After the user reported development 3.4.0 deployed and the installation current,
+the authorized SecretSpec-backed deployed suite passed **3/3**: authenticated
+discovery matches the approved local contract, company-managed export matches
+the independent populated Start date, and the team-managed case returns
+`eligibility-undetermined` (-32006) without a document. This verifies installed
+behavior despite the pasted deployment timestamp preceding the local commit;
+the timestamp alone is not evidence of which source revision was packaged.
+A sanitized development log read returned 995 bytes containing three completion
+records and no RPC error codes; it ran concurrently with the suite and is not
+claimed as correlated readback of all three new test invocations.
+
+This supersedes the earlier pre-deployment red result for these scenarios only.
+Secured-Epic and known-unreadable-Epic installed-app scenarios, team-managed
+secured detection, and eligibility-change event behavior remain unverified.
+Ticket 05 remains open and ticket 06 remains blocked. The agent performed no
+deployment, installation or live-data mutation.
+
+### Deferred negative Epic scenarios (user-approved 2026-11-18)
+
+The user deferred the secured-Epic and unreadable-existing-Epic deployed checks.
+Both remain executable test bodies registered with `it.skip.each` in the deployed
+suite, using aliases `readableSecuredEpic` (-32005) and `unreadableEpic` (-32001).
+To enable them, configure independently verified fixtures under those aliases in
+`test/deployed.local.json`, then remove the explicit skip. Do not substitute a
+nonexistent key for an independently known unreadable Epic.
+
+Read-only dataset discovery found five hierarchy-level-1 issue types, no readable
+secured Epics across those types, and 67 readable secured non-Epics (49 standard
+issues, 18 subtasks), all company-managed. The visible project catalog contained
+24 projects; it cannot establish hidden Epic existence. Skipped checks remain
+unverified, not passing evidence. Runtime fail-closed rules and active local
+security tests are unchanged. Other outstanding acceptance gates remain as above.
+
 ### Deterministic generation and failure behavior
 
 - Serialize fields in schema-table order and record fields in their defined
