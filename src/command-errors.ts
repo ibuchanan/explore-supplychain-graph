@@ -23,4 +23,6 @@ export const commandErrors = {
   },
   /** The direct-child listing was interrupted or incomplete. Never yields a smaller snapshot. May be transient. */
   "children-unreadable": { title: "Children unreadable", code: -32007 },
+  "document-too-large": { title: "Document too large", code: -32008 },
+  "too-many-children": { title: "Too many children", code: -32009 },
 } as const satisfies Record<string, CatalogProblemDefinition>;

@@ -196,7 +196,11 @@ export const exportWorkdown: HandlerMap<
     typeof issue.key !== "string" ||
     !issue.key.trim() ||
     typeof issue.fields.summary !== "string" ||
-    /[\r\n]/.test(issue.fields.summary)
+    /[\r\n]/.test(issue.fields.summary) ||
+    typeof issue.fields.updated !== "string" ||
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}(Z|[+-]\d{2}:?\d{2})$/.test(
+      issue.fields.updated,
+    )
   )
     return err("internal-error");
   if (new URL(baseUrl).protocol !== "https:") return err("internal-error");
@@ -209,7 +213,13 @@ export const exportWorkdown: HandlerMap<
     return err("internal-error");
   let children: Child[];
   try {
-    children = await readChildren(context, issue.id, new URL(baseUrl).origin);
+    const result = await readChildren(
+      context,
+      issue.id,
+      new URL(baseUrl).origin,
+    );
+    if (result === "too-many-children") return err(result);
+    children = result;
   } catch {
     return err("children-unreadable");
   }
@@ -252,5 +262,7 @@ export const exportWorkdown: HandlerMap<
     ...(children.length ? ["", childrenTable(children)] : []),
     "",
   ].join("\n");
+  if (Buffer.byteLength(document, "utf8") > 262144)
+    return err("document-too-large");
   return ok(document);
 };

@@ -202,6 +202,101 @@ async function exportPages(pages: unknown[][]) {
 }
 
 describe("workdown.export", () => {
+  it("enforces the canonical UTF-8 byte boundary without returning a partial document", async () => {
+    const description = (text: string) => ({
+      type: "doc",
+      version: 1,
+      content: [{ type: "paragraph", content: [{ type: "text", text }] }],
+    });
+    const baseline = (
+      await call({
+        ...epic,
+        fields: { ...epic.fields, description: description("é") },
+      })
+    ).result as string;
+    const padding = 262144 - Buffer.byteLength(baseline, "utf8");
+    const atLimit = await call({
+      ...epic,
+      fields: {
+        ...epic.fields,
+        description: description(`é${"a".repeat(padding)}`),
+      },
+    });
+    expect(atLimit.error).toBeUndefined();
+    expect(Buffer.byteLength(atLimit.result, "utf8")).toBe(262144);
+    expect(validateWorkdown(atLimit.result)).toBe(true);
+    const overLimit = await call({
+      ...epic,
+      fields: {
+        ...epic.fields,
+        description: description(`é${"a".repeat(padding)}b`),
+      },
+    });
+    expect(overLimit).not.toHaveProperty("result");
+    expect(overLimit.error).toEqual({
+      code: -32008,
+      message: "Document too large",
+    });
+  });
+  it.each([
+    { summary: "   " },
+    { issuetype: { name: "", hierarchyLevel: 1 } },
+    { updated: "2026-11-15" },
+  ])(
+    "never returns a successful invalid candidate for required values %j",
+    async (fields) => {
+      const response = await call({
+        ...epic,
+        fields: { ...epic.fields, ...fields },
+      });
+      expect(response).not.toHaveProperty("result");
+      expect(response.error).toEqual({
+        code: -32603,
+        message: "Internal error",
+      });
+    },
+  );
+  it("caps eligible children across pages without counting excluded children or leaking content", async () => {
+    const children = Array.from({ length: 101 }, (_, index) => ({
+      ...child,
+      id: String(20000 + index),
+    }));
+    const secured = {
+      ...child,
+      id: "99999",
+      fields: { ...child.fields, summary: "RESTRICTED", security: { id: "1" } },
+    };
+    const baseline = await exportPages([children.slice(0, 100)]);
+    const atLimit = await exportPages([
+      children.slice(0, 50),
+      [secured, ...children.slice(50, 100)],
+    ]);
+    expect(atLimit.result).toBe(baseline.result);
+    expect(validateWorkdown(atLimit.result)).toBe(true);
+    const logs = vi.spyOn(console, "info").mockImplementation(() => {});
+    try {
+      const response = await call(epic, undefined, 200, [], cloudId, (url) => {
+        if (!url.pathname.endsWith("/search/jql")) return undefined;
+        return url.searchParams.has("nextPageToken")
+          ? Response.json({ issues: [secured, children[100]], isLast: true })
+          : Response.json({
+              issues: children.slice(0, 100),
+              isLast: false,
+              nextPageToken: "next",
+            });
+      });
+      expect(response).not.toHaveProperty("result");
+      expect(response.error).toEqual({
+        code: -32009,
+        message: "Too many children",
+      });
+      expect(JSON.stringify(logs.mock.calls)).not.toMatch(
+        /RESTRICTED|Define availability|"childCount"|"excludedCount"/,
+      );
+    } finally {
+      logs.mockRestore();
+    }
+  });
   it("never discloses secured children, regardless of their number, content or page", async () => {
     await fc.assert(
       fc.asyncProperty(

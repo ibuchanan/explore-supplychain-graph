@@ -472,5 +472,43 @@ All Workdown producers MUST verify:
   duplicate identities, and size-limit violations are rejected without silent
   truncation.
 
+## Provisional Explore export limits
+
+The Explore application currently accepts at most **262144 bytes (256 KiB)**
+of complete canonical UTF-8 Workdown and **100 eligible direct children**.
+Exactly the limit is accepted; either excess fails the whole candidate, never
+truncates it. Measure the serialized document, including Frontmatter, escaped
+Markdown, and its final newline, not JavaScript string length or source text.
+Excluded children do not consume the child allowance or alter its outcome.
+These are application-profile policies, not universal Workdown format limits.
+
+Rationale and official sources (consulted 2026-11-18):
+
+- [Forge invocation limits](https://developer.atlassian.com/platform/forge/limits-invocation/)
+  document a 5 MB invocation payload ceiling;
+  [web trigger events](https://developer.atlassian.com/platform/forge/events-reference/web-trigger/)
+  explain that serialized request/response metadata also consumes the function
+  payload allowance. The conservative 256 KiB document cap leaves headroom for
+  JSON-RPC and nested webtrigger JSON escaping. It is an application choice
+  below that ceiling, not a documented TWG text-size allowance or a storage
+  capacity claim.
+- [TWG connector rate limits](https://developer.atlassian.com/platform/teamwork-graph/rate-limits/)
+  allow 100 objects per `setObject` request. Use 100 as a conservative initial
+  child-work budget, independently of Jira pagination and the byte cap. Child
+  summaries are embedded in one document, not individual TWG objects: that
+  batch limit does **not** impose an actual 100-child ingestion restriction.
+
+Both values are provisional. Ticket 14 must confirm or adjust them against
+actual deployed TWG ingestion and the chosen storage/delivery path before
+operational use. No such ingestion, storage, or worst-case cloud payload check
+has been performed for ticket 08. Async events must carry references rather
+than assuming that a full document fits their separate event payload limits.
+
+Limit errors contain only their stable code/message and no document, source
+values, counts, or diagnostics. Other incomplete or invalid candidates also
+fail whole. Repeating an unchanged successful export yields identical canonical
+bytes; no hash, retry timestamp, or new revision field is required. Storage and
+retention of the previous successful document on failure belong to ticket 13.
+
 Source-specific test suites, fixtures, and acceptance gates are documented in
 companion profiles; see [Source profiles](#source-profiles).

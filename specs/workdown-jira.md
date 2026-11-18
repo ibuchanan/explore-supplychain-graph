@@ -584,6 +584,35 @@ No modules, scopes, egress, storage, or dependencies changed. The OpenRPC exampl
 now includes the rich Description section and canonical child-label escaping,
 and is checked with the public document validator.
 
+### Ticket 08: export limits and atomic failure (2026-11-18)
+
+The approved `workdown.export` contract adds non-retryable
+`document-too-large` (-32008) and `too-many-children` (-32009). The provisional
+caps and platform-source rationale are recorded in
+[the format specification](workdown-spec.md#provisional-explore-export-limits):
+262144 canonical UTF-8 bytes and 100 eligible direct children, inclusive.
+Only eligible children consume the count allowance, accumulated across pages;
+secured children remain silently excluded. The reader stops with failure as
+soon as the eligible count exceeds the allowance, rather than reading more
+pages for an already invalid candidate. No successful snapshot is truncated.
+
+Local authenticated webtrigger/Command tests establish exact byte and child
+boundaries, UTF-8 rather than UTF-16 measurement, pagination-independent count
+limits, excluded-child noninterference, and content-free errors/logging. A new
+required-value regression rejects date-only `updated` timestamps rather than
+silently inventing midnight. Existing tests continue to cover interrupted
+listings, malformed or failed child reads, ambiguous field mappings, invalid
+required values, output-validator rejection, and identical canonical bytes on
+repeated/reordered input. These reuse the existing Command/public-validator
+seams; no private-helper mocks or new test framework were introduced.
+
+No deployment, installation, live-data changes, or cloud log readback was
+performed for ticket 08. The caps are locally enforced application policies,
+not verified TWG ingestion/storage capacities. Ticket 14 owns deployed
+confirmation; ticket 13 owns retention of a previous successful document.
+There are no new modules, permissions, egress destinations, dependencies, or
+storage writes.
+
 ### Deterministic generation and failure behavior
 
 - Serialize fields in schema-table order and record fields in their defined

@@ -31,7 +31,7 @@ export async function readChildren(
   context: CommandContext,
   parentId: string,
   origin: string,
-): Promise<Child[]> {
+): Promise<Child[] | "too-many-children"> {
   const query = new URLSearchParams({
     jql: `parent = ${parentId}`,
     fields: "summary,issuetype,status,resolution,parent,project,security",
@@ -127,6 +127,7 @@ export async function readChildren(
         throw new Error("Children unreadable");
       identities.add(issue.id);
       issues.push(issue);
+      if (issues.length > 100) return "too-many-children";
     }
     token = page.isLast ? undefined : (page.nextPageToken ?? undefined);
     if (token) tokens.add(token);
