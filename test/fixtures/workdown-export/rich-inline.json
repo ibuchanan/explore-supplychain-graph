@@ -1,0 +1,90 @@
+{
+  "type": "doc",
+  "version": 1,
+  "content": [
+    {
+      "type": "heading",
+      "attrs": { "level": 2 },
+      "content": [
+        { "type": "text", "text": "Acceptance — " },
+        { "type": "text", "text": "criteria", "marks": [{ "type": "em" }] },
+        { "type": "hardBreak" },
+        { "type": "text", "text": "code", "marks": [{ "type": "code" }] }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "content": [
+        { "type": "text", "text": "bold", "marks": [{ "type": "strong" }] },
+        { "type": "text", "text": " and " },
+        { "type": "text", "text": "emphasis", "marks": [{ "type": "em" }] },
+        { "type": "hardBreak" },
+        { "type": "text", "text": "a`b", "marks": [{ "type": "code" }] }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "content": [
+        {
+          "type": "text",
+          "text": "safe [label]",
+          "marks": [
+            {
+              "type": "link",
+              "attrs": { "href": "https://example.com/a(b)?q=1&x=2" }
+            }
+          ]
+        },
+        { "type": "text", "text": " / " },
+        {
+          "type": "text",
+          "text": "relative",
+          "marks": [{ "type": "link", "attrs": { "href": "/browse/DEMO-1" } }]
+        },
+        { "type": "text", "text": " / " },
+        {
+          "type": "text",
+          "text": "mail",
+          "marks": [
+            { "type": "link", "attrs": { "href": "mailto:team@example.com" } }
+          ]
+        },
+        { "type": "text", "text": " / " },
+        {
+          "type": "text",
+          "text": "unsafe",
+          "marks": [
+            { "type": "link", "attrs": { "href": "javascript:alert(1)" } }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "content": [
+        {
+          "type": "mention",
+          "attrs": { "id": "private-account", "text": "@Partner [team]" }
+        },
+        { "type": "text", "text": " <script>alert('x')</script> &copy;" },
+        {
+          "type": "inlineCard",
+          "attrs": { "url": "https://private.example.com/secret" }
+        }
+      ]
+    },
+    {
+      "type": "mediaSingle",
+      "content": [
+        {
+          "type": "media",
+          "attrs": { "id": "private-file", "alt": "private filename" }
+        }
+      ]
+    },
+    {
+      "type": "extension",
+      "content": [{ "type": "text", "text": "private extension payload" }]
+    }
+  ]
+}

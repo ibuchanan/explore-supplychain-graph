@@ -1083,7 +1083,7 @@ describe("workdown.export", () => {
     });
     expect(response.result).toContain("\n# \\*Literal\\* \\<tag\\>\n");
   });
-  it("fails closed for rich descriptions deferred to ticket 07", async () => {
+  it("fails closed for a malformed description document", async () => {
     expect(
       (
         await call({
@@ -1093,7 +1093,7 @@ describe("workdown.export", () => {
             description: {
               type: "doc",
               version: 1,
-              content: [{ type: "heading", content: [] }],
+              content: "unreadable",
             },
           },
         })
@@ -1291,6 +1291,252 @@ describe("workdown.export", () => {
     expect(response.error.code).toBe(-32603);
     expect(response).not.toHaveProperty("result");
   });
+  it("demotes source headings of every level and escapes literal heading text", async () => {
+    const response = await call({
+      ...epic,
+      fields: {
+        ...epic.fields,
+        description: {
+          type: "doc",
+          version: 1,
+          content: [
+            ...[1, 2, 3, 4, 5, 6].map((level) => ({
+              type: "heading",
+              attrs: { level },
+              content: [{ type: "text", text: `Level ${level}` }],
+            })),
+            { type: "heading", attrs: { level: 1 }, content: [] },
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "## Children" }],
+            },
+          ],
+        },
+      },
+    });
+    expect(response.error).toBeUndefined();
+    expect(response.result?.split("## Description\n\n")[1]).toBe(
+      "**Level 1**\n\n**Level 2**\n\n**Level 3**\n\n**Level 4**\n\n**Level 5**\n\n**Level 6**\n\n\\#\\# Children\n",
+    );
+    expect(validateWorkdown(response.result)).toBe(true);
+  });
+  it("preserves formatting and code pipes in table cells without creating extra columns", async () => {
+    const response = await call({
+      ...epic,
+      fields: {
+        ...epic.fields,
+        description: {
+          type: "doc",
+          version: 1,
+          content: [
+            {
+              type: "table",
+              content: [
+                {
+                  type: "tableRow",
+                  content: [
+                    {
+                      type: "tableCell",
+                      content: [
+                        {
+                          type: "paragraph",
+                          content: [
+                            {
+                              type: "text",
+                              text: "bold",
+                              marks: [{ type: "strong" }],
+                            },
+                            {
+                              type: "text",
+                              text: "a|b\nc",
+                              marks: [{ type: "code" }],
+                            },
+                            { type: "hardBreak" },
+                            { type: "text", text: "next" },
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      },
+    });
+    expect(response.error).toBeUndefined();
+    expect(response.result?.split("## Description\n\n")[1]).toBe(
+      "|  |\n| --- |\n| **bold**`a\\|b c` next |\n",
+    );
+    expect(validateWorkdown(response.result)).toBe(true);
+  });
+  it.each([
+    ["javascript:alert(1)", "label"],
+    ["data:text/html,<script>", "label"],
+    ["java\nscript:alert(1)", "label"],
+    ["https://user:password@example.com", "label"],
+    ["https://example.com/path", "[label](https://example.com/path)"],
+    ["http://example.com/path", "[label](http://example.com/path)"],
+    ["//other.example/path", "[label](https://other.example/path)"],
+  ])("applies the safe destination policy to %s", async (href, expected) => {
+    const response = await call({
+      ...epic,
+      fields: {
+        ...epic.fields,
+        description: {
+          type: "doc",
+          version: 1,
+          content: [
+            {
+              type: "paragraph",
+              content: [
+                {
+                  type: "text",
+                  text: "label",
+                  marks: [{ type: "link", attrs: { href } }],
+                },
+              ],
+            },
+          ],
+        },
+      },
+    });
+    expect(response.result?.split("## Description\n\n")[1]).toBe(
+      `${expected}\n`,
+    );
+    expect(validateWorkdown(response.result)).toBe(true);
+  });
+  it("escapes entities in titles and child table cells while preserving their metadata", async () => {
+    const response = await call(
+      { ...epic, fields: { ...epic.fields, summary: "A &copy; B" } },
+      undefined,
+      200,
+      [],
+      cloudId,
+      (url) =>
+        url.pathname.endsWith("/search/jql")
+          ? Response.json({
+              isLast: true,
+              issues: [
+                {
+                  ...child,
+                  fields: { ...child.fields, summary: "C &copy; D" },
+                },
+              ],
+            })
+          : undefined,
+    );
+    expect(response.result).toContain("\n# A &amp;copy; B\n");
+    expect(response.result).toContain("C &amp;copy; D](");
+    expect(parse(response.result.split("---\n")[1]).title).toBe("A &copy; B");
+    expect(validateWorkdown(response.result)).toBe(true);
+  });
+  it("drops headings with only whitespace and marks, and escapes pipes in table link destinations", async () => {
+    const response = await call({
+      ...epic,
+      fields: {
+        ...epic.fields,
+        description: {
+          type: "doc",
+          version: 1,
+          content: [
+            {
+              type: "heading",
+              content: [
+                { type: "text", text: "  ", marks: [{ type: "em" }] },
+                { type: "hardBreak" },
+              ],
+            },
+            {
+              type: "table",
+              content: [
+                {
+                  type: "tableRow",
+                  content: [
+                    {
+                      type: "tableCell",
+                      content: [
+                        {
+                          type: "paragraph",
+                          content: [
+                            {
+                              type: "text",
+                              text: "guide",
+                              marks: [
+                                {
+                                  type: "link",
+                                  attrs: { href: "https://example.com/a|b" },
+                                },
+                              ],
+                            },
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      },
+    });
+    expect(response.result?.split("## Description\n\n")[1]).toBe(
+      "|  |\n| --- |\n| [guide](https://example.com/a%7Cb) |\n",
+    );
+    expect(validateWorkdown(response.result)).toBe(true);
+  });
+  it("uses inline code delimiters that preserve boundary backticks and spaces", async () => {
+    const response = await call({
+      ...epic,
+      fields: {
+        ...epic.fields,
+        description: {
+          type: "doc",
+          version: 1,
+          content: [
+            {
+              type: "paragraph",
+              content: [
+                { type: "text", text: "`code`", marks: [{ type: "code" }] },
+                { type: "text", text: " / " },
+                { type: "text", text: " padded ", marks: [{ type: "code" }] },
+                { type: "text", text: " / " },
+                { type: "text", text: "   ", marks: [{ type: "code" }] },
+              ],
+            },
+          ],
+        },
+      },
+    });
+    expect(response.result?.split("## Description\n\n")[1]).toBe(
+      "`` `code` `` / `  padded  ` / `   `\n",
+    );
+    expect(validateWorkdown(response.result)).toBe(true);
+  });
+  it.each(["rich-inline", "rich-blocks"])(
+    "renders %s safely through the export Command and validates the document",
+    async (name) => {
+      const fixture = (extension: string) =>
+        readFileSync(
+          new URL(
+            `./fixtures/workdown-export/${name}.${extension}`,
+            import.meta.url,
+          ),
+          "utf8",
+        );
+      const response = await call({
+        ...epic,
+        fields: { ...epic.fields, description: JSON.parse(fixture("json")) },
+      });
+      expect(response.error).toBeUndefined();
+      expect(response.result?.split("## Description\n\n")[1]).toBe(
+        fixture("workdown"),
+      );
+      expect(validateWorkdown(response.result)).toBe(true);
+    },
+  );
   it("returns epic-plain-description.workdown for plain-text ADF", async () => {
     const description = {
       type: "doc",

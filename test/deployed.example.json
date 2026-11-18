@@ -5,7 +5,8 @@
       "projectType": "company-managed",
       "expected": {
         "start_date": "2025-08-16",
-        "children": []
+        "children": [],
+        "description": "**Acceptance criteria**\n\n- First item\n\n[Source guide](https://example.com/guide)\n\n[media omitted]"
       }
     },
     "epicWithoutStartDate": {

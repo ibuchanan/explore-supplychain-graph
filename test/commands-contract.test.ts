@@ -5,6 +5,7 @@ import { generateContract } from "@forge-ahead/rpc/generator";
 import { describe, expect, it } from "vitest";
 import { commandErrors } from "../src/command-errors";
 import commands from "../src/openrpc.json";
+import { validateWorkdown } from "../src/workdown-validation";
 import { validateOpenRpc } from "./openrpc";
 
 const fixture = (name: string) =>
@@ -19,6 +20,13 @@ describe("application Command contract", () => {
       validateOpenRpc(commands),
       JSON.stringify(validateOpenRpc.errors),
     ).toBe(true);
+  });
+
+  it("provides a valid rich-description Workdown example", () => {
+    const example = commands.methods[0]?.examples[0]?.result.value;
+    expect(validateWorkdown(example)).toBe(true);
+    expect(example).toContain("\n## Description\n\n**Acceptance criteria**");
+    expect(example).toContain("[media omitted]");
   });
 
   it("does not declare the reserved discovery method", () => {

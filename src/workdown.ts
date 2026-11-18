@@ -10,40 +10,9 @@ import {
   readChildren,
 } from "./workdown-children";
 
-const quote = JSON.stringify;
+import { descriptionText } from "./workdown-description";
 
-type Node = {
-  type: string;
-  version?: number;
-  text?: string;
-  marks?: unknown[];
-  content?: Node[];
-};
-function descriptionText(value: unknown): string {
-  if (value === null) return "No description provided.";
-  const doc = value as Node;
-  if (doc?.type !== "doc" || doc.version !== 1 || !Array.isArray(doc.content))
-    throw new Error("Invalid description");
-  const paragraphs = doc.content.map((paragraph) => {
-    if (
-      paragraph.type !== "paragraph" ||
-      !Array.isArray(paragraph.content ?? [])
-    )
-      throw new Error("Rich descriptions require ticket 07");
-    return (paragraph.content ?? [])
-      .map((node) => {
-        if (
-          node.type !== "text" ||
-          typeof node.text !== "string" ||
-          node.marks?.length
-        )
-          throw new Error("Unsupported inline content");
-        return escapeMarkdown(node.text.replace(/\r\n?/g, "\n"));
-      })
-      .join("");
-  });
-  return paragraphs.join("\n\n").trim() || "No description provided.";
-}
+const quote = JSON.stringify;
 
 type Epic = {
   id: string;
@@ -279,7 +248,7 @@ export const exportWorkdown: HandlerMap<
     "",
     "## Description",
     "",
-    descriptionText(issue.fields.description),
+    descriptionText(issue.fields.description, new URL(baseUrl).origin),
     ...(children.length ? ["", childrenTable(children)] : []),
     "",
   ].join("\n");

@@ -332,6 +332,39 @@ unrepresentable structures MUST NOT vanish silently. Raw HTML MUST NOT be
 emitted or executed. A viewer MUST treat all received Markdown as untrusted,
 disable raw HTML, and apply its own safe-link policy.
 
+#### Rich-text inventory
+
+The Jira ADF v1 input profile uses the following closed inventory. Unknown node
+and mark types are unsupported; their payloads and attributes are not traversed
+or disclosed. Malformed required document/text/container shapes fail the export.
+
+| ADF node or mark | Treatment |
+| --- | --- |
+| `doc` version 1 | Required root; render its blocks separated by blank lines. |
+| `paragraph`, `text` | Escaped literal text; normalize CRLF/CR to LF. Escape ampersands to preserve literal entities. |
+| `heading` levels 1–6 | Bold paragraph at any nesting depth, following Source headings above; redundant strong marks are absorbed. |
+| `hardBreak` | Markdown hard break; a space in a heading or table cell. |
+| `strong`, `em` marks | Bold and italic spans; whitespace-only non-code spans remain plain whitespace. |
+| `code` mark | Inline code with a backtick delimiter longer than all source runs; pad delimiter-adjacent backticks/spaces as needed. |
+| `link` mark | Explicit label only; HTTP(S), explicit `mailto:`, or relative destination resolved against the source-site origin. Reject controls/whitespace and embedded credentials. Encode Markdown destination delimiters and pipes. |
+| `mention` | Supplied `attrs.text` only, escaped; missing display text uses the unsupported marker. |
+| `bulletList`, `orderedList`, `listItem` | Nested Markdown lists; ordered lists retain a nonnegative integer start, default 1. |
+| `blockquote` | Prefix each contained line with `> `; retain block separation. |
+| `codeBlock` | Backtick fence of at least three, longer than every source backtick run; preserve code text and Unicode after LF normalization. Retain only a language token containing letters, digits, `_`, `+`, or `-`. |
+| `table`, `tableRow`, `tableHeader`, `tableCell` | Rectangular pipe table without merged cells. Use the first all-header row as its header, otherwise add an empty header. Paragraphs/headings in cells become inline spans separated by spaces; escape literal pipes, including inline code pipes. |
+| `rule` | Markdown thematic break `---`. |
+| `media`, `mediaSingle`, `mediaGroup` | One `[media omitted]` marker per encountered node/container; no child traversal or attributes. |
+| Merged/ragged tables; non-paragraph/heading cell blocks | `[unsupported content omitted]` for the table or unsupported cell block respectively. |
+| `inlineCard`, `blockCard`, `embedCard`, `emoji`, `date`, `status`, `panel`, `expand`, `nestedExpand`, `decisionList`, `decisionItem`, `taskList`, `taskItem`, `bodiedExtension`, `extension`, `inlineExtension`, `caption`, `layoutSection`, `layoutColumn` | Unsupported: `[unsupported content omitted]`; no URL expansion or payload disclosure. |
+| `strike`, `underline`, `subsup`, `textColor`, `backgroundColor`, `alignment`, `indentation`, `border`, `breakout`, `annotation` marks | Keep escaped text and append `[unsupported content omitted]` for each unsupported mark; attributes are omitted. |
+| Any other node or mark | Same unsupported marker; never silently discard an unrepresentable structure. |
+
+Code inside table cells necessarily uses the pipe-table escape for `|` and
+spaces for line breaks. Inline code line breaks outside tables follow Markdown
+code-span normalization; fenced blocks preserve code whitespace. Literal HTML
+text is escaped, never passed through. Node attributes not named above are not
+rendered. Viewers must still disable raw HTML and enforce safe destinations.
+
 ### Children
 
 When `children` is non-empty, render one table under `## Children` with columns

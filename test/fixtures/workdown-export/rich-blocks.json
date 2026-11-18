@@ -1,0 +1,119 @@
+{
+  "type": "doc",
+  "version": 1,
+  "content": [
+    {
+      "type": "bulletList",
+      "content": [
+        {
+          "type": "listItem",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [{ "type": "text", "text": "First" }]
+            },
+            {
+              "type": "orderedList",
+              "attrs": { "order": 3 },
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "heading",
+                      "attrs": { "level": 6 },
+                      "content": [{ "type": "text", "text": "Nested" }]
+                    },
+                    {
+                      "type": "paragraph",
+                      "content": [{ "type": "text", "text": "Detail" }]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "blockquote",
+      "content": [
+        {
+          "type": "heading",
+          "content": [{ "type": "text", "text": "Quoted" }]
+        },
+        {
+          "type": "paragraph",
+          "content": [{ "type": "text", "text": "## Literal" }]
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "content": [
+        {
+          "type": "tableRow",
+          "content": [
+            {
+              "type": "tableHeader",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [{ "type": "text", "text": "A|B" }]
+                }
+              ]
+            },
+            {
+              "type": "tableHeader",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [{ "type": "text", "text": "Detail" }]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "tableRow",
+          "content": [
+            {
+              "type": "tableCell",
+              "content": [
+                {
+                  "type": "heading",
+                  "content": [{ "type": "text", "text": "Cell\nheading" }]
+                }
+              ]
+            },
+            {
+              "type": "tableCell",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [{ "type": "text", "text": "x|y\nnext" }]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "codeBlock",
+      "attrs": { "language": "typescript" },
+      "content": [
+        {
+          "type": "text",
+          "text": "## Children\n```\n~~~\nconst text = '“Unicode”—';\n"
+        }
+      ]
+    },
+    {
+      "type": "codeBlock",
+      "content": [{ "type": "text", "text": "  leading\ntrailing  " }]
+    },
+    { "type": "rule" }
+  ]
+}

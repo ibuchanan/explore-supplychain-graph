@@ -107,7 +107,7 @@ export function validateWorkdown(text: unknown): boolean {
     )
       return false;
     const escapeTitle = (value: string) =>
-      value.replace(/[\\`*_{}[\]<>()#+!|~>-]/g, "\\$&");
+      value.replace(/&/g, "&amp;").replace(/[\\`*_{}[\]<>()#+!|~>-]/g, "\\$&");
     if (
       !text
         .slice(end + 5)

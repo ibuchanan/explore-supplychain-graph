@@ -109,6 +109,21 @@ for (const [alias, issue] of Object.entries(scenarios.issues)) {
       "children match independent scenario in native-ID lexical order",
     ).toBe(true);
     expect(Object.hasOwn(metadata, "parent"), "Epic omits parent").toBe(false);
+    const document = response.result as string;
+    const description = document.slice(
+      document.indexOf("\n## Description\n\n") + "\n## Description\n\n".length,
+    );
+    const childTable = children?.length
+      ? description.lastIndexOf("\n\n## Children\n\n")
+      : -1;
+    const actualDescription =
+      childTable < 0
+        ? description.slice(0, -1)
+        : description.slice(0, childTable);
+    expect(
+      actualDescription === issue.expected.description,
+      "description matches independent scenario",
+    ).toBe(true);
     const expected = issue.expected.start_date;
     expect(
       expected === null

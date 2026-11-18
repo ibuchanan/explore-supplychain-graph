@@ -1,0 +1,12 @@
+**Acceptance — *criteria* `code`**
+
+**bold** and *emphasis*  
+``a`b``
+
+[safe \[label\]](https://example.com/a%28b%29?q=1&x=2) / [relative](https://source.example.com/browse/DEMO-1) / [mail](mailto:team@example.com) / unsafe
+
+@Partner \[team\] \<script\>alert\('x'\)\</script\> &amp;copy;[unsupported content omitted]
+
+[media omitted]
+
+[unsupported content omitted]

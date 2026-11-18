@@ -1,7 +1,7 @@
 import { type CommandContext, jiraGet } from "./jira";
 
 export const escapeMarkdown = (text: string) =>
-  text.replace(/[\\`*_{}[\]<>()#+!|~>-]/g, "\\$&");
+  text.replace(/&/g, "&amp;").replace(/[\\`*_{}[\]<>()#+!|~>-]/g, "\\$&");
 
 export type Child = {
   source_id: string;

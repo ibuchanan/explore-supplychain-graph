@@ -7,7 +7,11 @@ const scenario = (start_date: unknown = "2026-11-17") => ({
     epic: {
       key: "EXAMPLE-123",
       projectType: "company-managed",
-      expected: { start_date, children: [] },
+      expected: {
+        start_date,
+        children: [],
+        description: "No description provided.",
+      },
     },
   },
 });
@@ -76,10 +80,37 @@ it.each([
   },
 );
 
+it("loads an independent rich-description expectation and rejects missing or invalid values", () => {
+  const value = scenario();
+  const expected = {
+    ...value.issues.epic.expected,
+    description: "**Acceptance**\n\n- First\n\n```\n## code\n```",
+  };
+  expect(
+    parseDeployedScenarios(
+      JSON.stringify({ issues: { epic: { ...value.issues.epic, expected } } }),
+    ).issues["epic"]?.expected,
+  ).toEqual(expected);
+  for (const description of [undefined, null, 42, "", "text\r\n"]) {
+    expect(() =>
+      parseDeployedScenarios(
+        JSON.stringify({
+          issues: {
+            epic: {
+              ...value.issues.epic,
+              expected: { ...expected, description },
+            },
+          },
+        }),
+      ),
+    ).toThrow(/content suppressed/);
+  }
+});
+
 it("loads explicit eligibility failure expectations without a Start date", () => {
   const value = scenario();
   const text = JSON.stringify(value).replace(
-    '"start_date":"2026-11-17","children":[]',
+    '"start_date":"2026-11-17","children":[],"description":"No description provided."',
     '"errorCode":-32006',
   );
   expect(parseDeployedScenarios(text).issues["epic"]?.expected).toEqual({

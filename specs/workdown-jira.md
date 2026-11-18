@@ -557,6 +557,33 @@ dataset cases remain explicit gaps, not a requirement to manufacture test data.
 API reference inspected for the implementation:
 [Jira enhanced JQL search](https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-search/#api-rest-api-3-search-jql-get).
 
+### Rich-description export implementation (ticket 07, 2026-11-18)
+
+The authenticated `workdown.export` Command now renders ADF v1 through the
+closed rich-text inventory in the format specification. Local Command tests
+compare independent golden Markdown fixtures and validate the resulting full
+Workdown document. They cover all heading levels, nested lists/quotes/tables,
+inline formatting, adaptive code fences, Unicode and code whitespace, safe and
+rejected links, supplied mention text, media/unsupported omission, and attempted
+HTML. Titles and child table cells also preserve literal HTML entity text.
+Unknown nodes are not traversed, and no profile, media, smart-link or linked-page
+lookups were added.
+
+The shared installed-test scenario now requires `expected.description` for
+successful exports: an independently established, LF-only Markdown description
+without the section heading or final document newline. The example scenario
+shows a mix of heading, list, link and media output; it is illustrative, not a
+claim about any private live issue. Existing private successful scenarios must
+be updated before running the installed suite. Missing expectations fail before
+cloud calls; result comparisons suppress private content.
+
+**Evidence boundary:** all renderer behavior above is locally verified. No app
+was deployed or installed for ticket 07; mixed-node real Jira export and cloud
+log readback remain unverified and require approval plus a known-value scenario.
+No modules, scopes, egress, storage, or dependencies changed. The OpenRPC example
+now includes the rich Description section and canonical child-label escaping,
+and is checked with the public document validator.
+
 ### Deterministic generation and failure behavior
 
 - Serialize fields in schema-table order and record fields in their defined
