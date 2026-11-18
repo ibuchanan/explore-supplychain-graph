@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { ok } from "@forge-ahead/errors";
 import { createWebDispatcher } from "@forge-ahead/rpc";
+import fc from "fast-check";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { parse, stringify } from "yaml";
 import { runSync } from "../src/index";
@@ -118,7 +119,158 @@ const child = {
   },
 };
 
+const inlineText = fc
+  .string({
+    unit: fc.constantFrom(
+      ...'abc XYZ09\\`*_{}[]<>()#+!|~>-"\t',
+      "é",
+      "中",
+      "🙂",
+    ),
+    maxLength: 40,
+  })
+  .filter((text) => text.trim().length > 0);
+const fakeChild = fc
+  .record({
+    id: fc.integer({ min: 1, max: 9999 }).map(String),
+    summary: inlineText,
+    workType: inlineText,
+    status: fc.option(inlineText, { nil: null }),
+    resolution: fc.option(inlineText, { nil: null }),
+  })
+  .map(({ id, summary, workType, status, resolution }) => ({
+    ...child,
+    id,
+    key: `DEMO-${id}`,
+    fields: {
+      ...child.fields,
+      summary,
+      issuetype: { name: workType, subtask: false },
+      status: status === null ? null : { name: status },
+      resolution: resolution === null ? null : { name: resolution },
+    },
+  }));
+const fakeChildren = fc.uniqueArray(fakeChild, {
+  selector: (issue) => issue.id,
+  maxLength: 10,
+});
+const childPages = fakeChildren.chain((issues) =>
+  fc
+    .shuffledSubarray(issues, {
+      minLength: issues.length,
+      maxLength: issues.length,
+    })
+    .chain((shuffled) =>
+      fc
+        .array(fc.boolean(), {
+          minLength: shuffled.length,
+          maxLength: shuffled.length,
+        })
+        .map((cuts) => {
+          const pages: (typeof issues)[] = [[]];
+          shuffled.forEach((issue, index) => {
+            pages[pages.length - 1]?.push(issue);
+            if (cuts[index]) pages.push([]);
+          });
+          return { issues, pages };
+        }),
+    ),
+);
+
+async function exportPages(pages: unknown[][]) {
+  const tokens: (string | null)[] = [];
+  const response = await call(epic, undefined, 200, [], cloudId, (url) => {
+    if (!url.pathname.endsWith("/search/jql")) return undefined;
+    expect(url.searchParams.get("jql")).toBe("parent = 10042");
+    expect(url.searchParams.get("failFast")).toBe("true");
+    expect(url.searchParams.get("fields")).toBe(
+      "summary,issuetype,status,resolution,parent,project,security",
+    );
+    tokens.push(url.searchParams.get("nextPageToken"));
+    const index = tokens.length - 1;
+    if (index >= pages.length) throw new Error("Unexpected child page request");
+    return Response.json({
+      issues: pages[index],
+      isLast: index === pages.length - 1,
+      ...(index < pages.length - 1
+        ? { nextPageToken: `page-${index + 1}` }
+        : {}),
+    });
+  });
+  expect(response.error).toBeUndefined();
+  return { ...response, tokens };
+}
+
 describe("workdown.export", () => {
+  it("never discloses secured children, regardless of their number, content or page", async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        childPages,
+        fc.array(
+          fc.record({
+            id: fc.integer({ min: 100000, max: 999999 }).map(String),
+            fields: fc.jsonValue(),
+            page: fc.nat(),
+          }),
+          { minLength: 1, maxLength: 10 },
+        ),
+        async ({ pages }, secured) => {
+          const logs = vi.spyOn(console, "info").mockImplementation(() => {});
+          try {
+            const baseline = await exportPages(pages);
+            logs.mockClear();
+            const mixed: unknown[][] = pages.map((page) => [...page]);
+            for (const issue of secured) {
+              mixed[issue.page % mixed.length]?.unshift({
+                id: issue.id,
+                key: `PRIVATE-${issue.id}`,
+                fields: {
+                  private: issue.fields,
+                  summary: `PRIVATE-${issue.id}`,
+                  security: { id: issue.id },
+                },
+              });
+            }
+            const result = await exportPages(mixed);
+            expect(result.result).toBe(baseline.result);
+            expect(JSON.stringify(logs.mock.calls)).not.toContain("PRIVATE-");
+          } finally {
+            logs.mockRestore();
+          }
+        },
+      ),
+    );
+  });
+  it("exports identical bytes in lexical native-ID order for any ordering or page split", async () => {
+    await fc.assert(
+      fc.asyncProperty(childPages, async ({ issues, pages }) => {
+        const baseline = await exportPages([issues]);
+        const paged = await exportPages(pages);
+        expect(paged.result).toBe(baseline.result);
+        expect(paged.tokens).toEqual([
+          null,
+          ...pages.slice(1).map((_, index) => `page-${index + 1}`),
+        ]);
+        const metadata = parse(paged.result.split("---\n")[1]);
+        const ids = issues.map((issue) => issue.id).sort();
+        expect(
+          (metadata.children ?? []).map(
+            (item: { source_id: string }) => item.source_id,
+          ),
+        ).toEqual(ids.map((id) => `ari:cloud:jira:${cloudId}:issue/${id}`));
+        expect(metadata.sources.slice(1)).toEqual(
+          (metadata.children ?? []).map(
+            (item: { source_id: string; resource: string; title: string }) => ({
+              id: item.source_id,
+              resource: item.resource,
+              title: item.title,
+            }),
+          ),
+        );
+        expect(validateWorkdown(paged.result)).toBe(true);
+      }),
+    );
+  });
   it("exports one direct child with matching sources and an escaped Children table", async () => {
     const response = await call(epic, undefined, 200, [], cloudId, (url) =>
       url.pathname.endsWith("/search/jql")
@@ -163,28 +315,6 @@ describe("workdown.export", () => {
       },
     };
     const second = { ...child, id: "10", key: "DEMO-10" };
-    const exportPages = async (pages: unknown[][]) => {
-      const tokens: (string | null)[] = [];
-      const response = await call(epic, undefined, 200, [], cloudId, (url) => {
-        if (!url.pathname.endsWith("/search/jql")) return undefined;
-        expect(url.searchParams.get("jql")).toBe("parent = 10042");
-        expect(url.searchParams.get("failFast")).toBe("true");
-        expect(url.searchParams.get("fields")).toBe(
-          "summary,issuetype,status,resolution,parent,project,security",
-        );
-        tokens.push(url.searchParams.get("nextPageToken"));
-        const index = tokens.length - 1;
-        return Response.json({
-          issues: pages[index],
-          isLast: index === pages.length - 1,
-          ...(index < pages.length - 1
-            ? { nextPageToken: `page-${index + 1}` }
-            : {}),
-        });
-      });
-      expect(response.error).toBeUndefined();
-      return { ...response, tokens };
-    };
     const paged = await exportPages([[first], [second]]);
     const unpaged = await exportPages([
       [
@@ -211,61 +341,123 @@ describe("workdown.export", () => {
     expect(paged.result).toContain("Pipe \\| \\<text\\>");
     expect(validateWorkdown(paged.result)).toBe(true);
   });
-  it.each([
-    { issues: [child], isLast: false },
-    { issues: [child] },
-    { issues: [child], isLast: true, nextPageToken: "contradiction" },
-    {
-      issues: [child],
-      isLast: true,
-      warnings: [{ message: "private-truncation" }],
-    },
-    { issues: [child], isLast: "true" },
-    { issues: null, isLast: true },
-  ])(
-    "fails the whole export on incomplete or ambiguous child pagination (case %#)",
-    async (page) => {
-      const response = await call(epic, undefined, 200, [], cloudId, (url) =>
-        url.pathname.endsWith("/search/jql") ? Response.json(page) : undefined,
-      );
-      expect(response).toEqual({
-        jsonrpc: "2.0",
-        id: 1,
-        error: { code: -32007, message: "Children unreadable" },
-      });
-    },
-  );
-  it.each(["failed-page", "repeated-token", "bad-json", "network"])(
-    "returns no partial document after %s",
-    async (failure) => {
-      let pages = 0;
-      const response = await call(epic, undefined, 200, [], cloudId, (url) => {
-        if (!url.pathname.endsWith("/search/jql")) return undefined;
-        if (++pages === 1)
-          return Response.json({
-            issues: [child],
-            isLast: false,
-            nextPageToken: "again",
+  it("fails closed on malformed pagination or transport failure after any valid prefix", async () => {
+    const invalidPage = fc.oneof(
+      fc.constant({ issues: [child], isLast: false }),
+      fc.constant({ issues: [child] }),
+      inlineText.map((token) => ({
+        issues: [child],
+        isLast: true,
+        nextPageToken: token,
+      })),
+      fc.jsonValue().map((warning) => ({
+        issues: [child],
+        isLast: true,
+        warnings: [warning],
+      })),
+      fc
+        .jsonValue()
+        .filter((value) => typeof value !== "boolean")
+        .map((isLast) => ({ issues: [child], isLast })),
+      fc
+        .jsonValue()
+        .filter((value) => !Array.isArray(value))
+        .map((issues) => ({ issues, isLast: true })),
+      fc.constant(null),
+    );
+    await fc.assert(
+      fc.asyncProperty(
+        childPages,
+        fc.nat(),
+        fc.constantFrom(
+          "page",
+          "failed-page",
+          "repeated-token",
+          "bad-json",
+          "network",
+        ),
+        invalidPage,
+        fc.constantFrom(401, 403, 404, 429, 500, 503),
+        async ({ pages }, offset, failure, malformed, status) => {
+          const prefixLength =
+            failure === "repeated-token"
+              ? 1 + (offset % pages.length)
+              : offset % (pages.length + 1);
+          let requests = 0;
+          const response = await call(
+            epic,
+            undefined,
+            200,
+            [],
+            cloudId,
+            (url) => {
+              if (!url.pathname.endsWith("/search/jql")) return undefined;
+              const index = requests++;
+              if (index < prefixLength)
+                return Response.json({
+                  issues: pages[index],
+                  isLast: false,
+                  nextPageToken: `page-${index + 1}`,
+                });
+              if (index > prefixLength)
+                throw new Error("Unexpected request after failed page");
+              if (failure === "network")
+                throw new Error("private-network-details");
+              if (failure === "bad-json")
+                return new Response("private-invalid-json");
+              if (failure === "failed-page")
+                return new Response("private-upstream", { status });
+              return Response.json(
+                failure === "repeated-token"
+                  ? {
+                      issues: [],
+                      isLast: false,
+                      nextPageToken: `page-${1 + (offset % prefixLength)}`,
+                    }
+                  : malformed,
+              );
+            },
+          );
+          expect(response).toEqual({
+            jsonrpc: "2.0",
+            id: 1,
+            error: { code: -32007, message: "Children unreadable" },
           });
-        if (failure === "network") throw new Error("private-network-details");
-        if (failure === "bad-json") return new Response("not json");
-        if (failure === "failed-page")
-          return new Response("private-upstream", { status: 403 });
-        if (pages > 2) throw new Error("test stops unbounded pagination");
-        return Response.json({
-          issues: [],
-          isLast: false,
-          nextPageToken: "again",
-        });
+          expect(requests).toBe(prefixLength + 1);
+        },
+      ),
+    );
+  });
+  it("rejects a non-final page without a continuation token", async () => {
+    const response = await call(epic, undefined, 200, [], cloudId, (url) =>
+      url.pathname.endsWith("/search/jql")
+        ? Response.json({ issues: [child], isLast: false })
+        : undefined,
+    );
+    expect(response).toEqual({
+      jsonrpc: "2.0",
+      id: 1,
+      error: { code: -32007, message: "Children unreadable" },
+    });
+  });
+  it("returns no partial document when a continuation token repeats", async () => {
+    let pages = 0;
+    const response = await call(epic, undefined, 200, [], cloudId, (url) => {
+      if (!url.pathname.endsWith("/search/jql")) return undefined;
+      if (++pages > 2) throw new Error("test stops unbounded pagination");
+      return Response.json({
+        issues: pages === 1 ? [child] : [],
+        isLast: false,
+        nextPageToken: "again",
       });
-      expect(response).toEqual({
-        jsonrpc: "2.0",
-        id: 1,
-        error: { code: -32007, message: "Children unreadable" },
-      });
-      expect(pages).toBe(2);
-    },
-  );
+    });
+    expect(response).toEqual({
+      jsonrpc: "2.0",
+      id: 1,
+      error: { code: -32007, message: "Children unreadable" },
+    });
+    expect(pages).toBe(2);
+  });
   it("silently excludes secured children without exposing their data or counts", async () => {
     const logs = vi.spyOn(console, "info").mockImplementation(() => {});
     try {
@@ -352,6 +544,123 @@ describe("workdown.export", () => {
       });
     },
   );
+  it("round-trips Markdown-sensitive text through export, YAML parsing and validateWorkdown", async () => {
+    const description = fc
+      .array(
+        fc.oneof(
+          inlineText,
+          fc.constantFrom(
+            "\n",
+            "\r\n",
+            "\r",
+            "## Children",
+            "```",
+            "~~~",
+            "---",
+            "| a | b |",
+          ),
+        ),
+        { maxLength: 10 },
+      )
+      .map((parts) => parts.join(""));
+    const escaped = (text: string) =>
+      [...text]
+        .map((character) =>
+          "\\`*_{}[]<>()#+!|~>-".includes(character)
+            ? `\\${character}`
+            : character,
+        )
+        .join("");
+    await fc.assert(
+      fc.asyncProperty(
+        inlineText,
+        description,
+        fakeChildren,
+        async (title, text, issues) => {
+          const response = await call(
+            {
+              ...epic,
+              fields: {
+                ...epic.fields,
+                summary: title,
+                description: {
+                  type: "doc",
+                  version: 1,
+                  content: [
+                    { type: "paragraph", content: [{ type: "text", text }] },
+                  ],
+                },
+              },
+            },
+            undefined,
+            200,
+            [],
+            cloudId,
+            (url) =>
+              url.pathname.endsWith("/search/jql")
+                ? Response.json({ issues, isLast: true })
+                : undefined,
+          );
+          expect(response.error).toBeUndefined();
+          const document: string = response.result;
+          expect(validateWorkdown(document)).toBe(true);
+          const end = document.indexOf("\n---\n", 4);
+          const metadata = parse(document.slice(4, end));
+          const body = document.slice(end + 5);
+          expect(metadata.title).toBe(title);
+          expect(metadata.sources[0].title).toBe(title);
+          expect(
+            (metadata.children ?? []).map(
+              (item: { title: string }) => item.title,
+            ),
+          ).toEqual(
+            [...issues]
+              .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+              .map((issue) => issue.fields.summary),
+          );
+          const normalized =
+            escaped(text.replace(/\r\n?/g, "\n")).trim() ||
+            "No description provided.";
+          const sorted = [...issues].sort((a, b) =>
+            a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
+          );
+          const table = sorted.length
+            ? [
+                "",
+                "## Children",
+                "",
+                "| Work item | Type | Status | Resolution |",
+                "| --- | --- | --- | --- |",
+                ...sorted.map(
+                  (issue) =>
+                    `| [${escaped(`${issue.key}: ${issue.fields.summary}`)}](https://source.example.com/browse/${issue.key}) | ${escaped(issue.fields.issuetype.name)} | ${issue.fields.status ? escaped(issue.fields.status.name) : "—"} | ${issue.fields.resolution ? escaped(issue.fields.resolution.name) : "—"} |`,
+                ),
+                "",
+              ].join("\n")
+            : "";
+          expect(body).toBe(
+            `\n# ${escaped(title)}\n\n## Description\n\n${normalized}\n${table}`,
+          );
+          const reserialized = `---\n${stringify(metadata, { defaultStringType: "QUOTE_DOUBLE", defaultKeyType: "PLAIN" })}---\n${body}`;
+          expect(validateWorkdown(reserialized)).toBe(true);
+          expect(
+            validateWorkdown(
+              document.replace(
+                `\n# ${escaped(title)}\n`,
+                `\n# changed ${escaped(title)}\n`,
+              ),
+            ),
+          ).toBe(false);
+          if (issues.length)
+            expect(
+              validateWorkdown(
+                document.replace("| Work item |", "| Changed |"),
+              ),
+            ).toBe(false);
+        },
+      ),
+    );
+  });
   it("validates standalone parent records and rejects identity or Children table mismatches", async () => {
     const response = await call(epic, undefined, 200, [], cloudId, (url) =>
       url.pathname.endsWith("/search/jql")
