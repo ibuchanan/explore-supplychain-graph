@@ -414,6 +414,63 @@ Eligibility checks do not replicate source permissions or revoke copies already
 shared. Source permission changes and missed events can leave stale content;
 the parent spec's withdrawal and freshness limitations still apply.
 
+### Ticket 05 eligibility evidence and remaining gates (2026-11-18)
+
+The local Command now explicitly requests `security` with `failFast=true`, using
+only the authenticated principal's Jira credential. HTTP 401/403/404 return the
+same `forbidden` error. A readable Epic with a numeric security-level ID returns
+`issue-ineligible`; absent, malformed, failed or undecodable security reads return
+`eligibility-undetermined`. Neither error includes source content. Only an
+explicit null security value in a characterized project type permits generation.
+No app credential or fallback authorizes disclosure. The OpenRPC contract is
+unchanged.
+
+Read-only, SecretSpec-backed Jira REST probes on the existing site observed:
+
+- Company-managed software Epic: HTTP 200, explicit `security: null`, security
+  schema `{type: securitylevel, system: security}`, `simplified: false`;
+  separate project read reports `style: classic`.
+- Team-managed business Epic: HTTP 200, the same null security/schema shape,
+  `simplified: true`; separate project read reports `style: next-gen`.
+- Readable company-managed secured subtask: HTTP 200, security object with a
+  numeric string ID, name, description and self link. This establishes an object
+  shape, **not** secured-Epic or direct-child acceptance. The bounded
+  `level is not EMPTY AND issuetype = Epic` search returned zero visible items;
+  that says nothing about items hidden from this principal.
+
+Sanitized structural projections (identities and content removed/replaced) are
+in `test/fixtures/workdown-export/security-characterization.json`. Null is not
+inferred from absence. Team-managed secured-item behavior is unverified, so
+team-managed and unknown project shapes fail closed. Company-managed null/object
+handling has local coverage and real REST shape evidence, but still needs the
+secured-Epic and unreadable-Epic installed-app acceptance cases. These
+restrictions do not relax ADR 0002 or declare every classic project verified.
+
+**Republishing decision:** retain the sharing principal's account ID with a
+future Exchange, never the request API token. Every later publication must
+re-read the Epic and complete eligible children under that principal's current
+permissions. If a supported user-authorized execution mechanism is unavailable,
+fail closed; event-triggered app access cannot replace it. Account replacement
+requires fresh authorization. Ticket 15 must implement and verify that mechanism
+before automatic republishing is usable. No principal is persisted by this
+stateless export ticket.
+
+No event subscriptions were added and no permission/security mutations were
+performed. Usable events for security-level, permission or principal changes
+remain unverified; do not assume events cover every eligibility change. Child
+listing remains ticket 06, and automatic publication remains gated by ticket 15.
+
+**Verification boundary:** local authenticated webtrigger tests cover eligible,
+ineligible, forbidden, and indeterminate outcomes, caller credential routing,
+malformed/failed reads, and content-free denial logs. The existing installed-app
+suite ran read-only: 1 passed, 2 failed (discovery contract drift and the old
+team-managed handler succeeding instead of the new expected -32006). This is a
+pre-deployment red gate, not acceptance of the new handler. A development log
+read returned no records; new cloud invocation/log evidence is still pending.
+No deployment, installation, scopes, egress or manifest changes were made.
+Ticket 05 remains incomplete and does not unblock ticket 06 until the remaining
+acceptance evidence is recorded after separately approved release work.
+
 ### Deterministic generation and failure behavior
 
 - Serialize fields in schema-table order and record fields in their defined

@@ -398,9 +398,15 @@ automatically. Keep aliases generic because aliases and declared project types
 appear in test names.
 
 Each named entry under `issues` contains `key`, `projectType` (company-managed
-or team-managed), and `expected.start_date`. A date asserts the exact exported
-value; `null` asserts that the field is omitted. Missing expectations, invalid
-calendar dates, unknown properties, and empty issue sets fail configuration
+or team-managed), and exactly one of `expected.start_date` or
+`expected.errorCode`. A date asserts the exact exported value; `null` asserts
+that the field is omitted. Error codes -32001, -32005 and -32006 assert forbidden,
+ineligible and indeterminate eligibility respectively, with no document. The
+current team-managed example expects -32006 because secured-item detection is
+unverified for that project type. Do not invent negative issue identities:
+configure a known readable secured Epic and a known unreadable Epic when available.
+Missing expectations, invalid calendar dates, unknown properties, and empty issue
+sets fail configuration
 validation before any network request. Remove illustrative scenarios that do
 not apply; two project types are not mandatory. Declared project types are
 operator-supplied coverage labels, not independently verified by the harness.

@@ -1,0 +1,40 @@
+{
+  "observedAt": "2026-11-18",
+  "transport": "caller-token Jira REST v3 (not deployed new handler)",
+  "companyManagedEpic": {
+    "status": 200,
+    "bytes": 1866,
+    "fields": {
+      "security": null,
+      "project": { "simplified": false },
+      "issuetype": { "hierarchyLevel": 1 }
+    },
+    "schema": { "security": { "type": "securitylevel", "system": "security" } }
+  },
+  "teamManagedEpic": {
+    "status": 200,
+    "bytes": 1930,
+    "fields": {
+      "security": null,
+      "project": { "simplified": true },
+      "issuetype": { "hierarchyLevel": 1 }
+    },
+    "schema": { "security": { "type": "securitylevel", "system": "security" } }
+  },
+  "companyManagedSecuredItem": {
+    "status": 200,
+    "bytes": 2111,
+    "fields": {
+      "security": {
+        "id": "10001",
+        "name": "synthetic-level",
+        "description": "",
+        "self": "https://example.invalid/securitylevel/10001"
+      },
+      "project": { "simplified": false },
+      "issuetype": { "hierarchyLevel": -1 }
+    },
+    "schema": { "security": { "type": "securitylevel", "system": "security" } }
+  },
+  "notes": "Structural projections only. All security values replaced with synthetic literals. Secured sample is a subtask, not an Epic or direct child. No readable secured Epic returned by bounded search. Team-managed secured detection and unreadable Epic are unverified."
+}

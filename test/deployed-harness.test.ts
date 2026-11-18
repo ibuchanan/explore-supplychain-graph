@@ -57,6 +57,17 @@ it.each([
   },
 );
 
+it("loads explicit eligibility failure expectations without a Start date", () => {
+  const value = scenario();
+  const text = JSON.stringify(value).replace(
+    '"start_date":"2026-11-17"',
+    '"errorCode":-32006',
+  );
+  expect(parseDeployedScenarios(text).issues["epic"]?.expected).toEqual({
+    errorCode: -32006,
+  });
+});
+
 const env = {
   WORKDOWN_RPC_URL: "https://example.invalid/private",
   WORKDOWN_TEST_EMAIL: "synthetic@example.invalid",
@@ -94,6 +105,28 @@ describe("deployed RPC helper", () => {
     );
   });
 
+  it("returns only the expected RPC error code and rejects accidental success", async () => {
+    const call = createDeployedRpc(
+      env,
+      vi.fn<typeof fetch>().mockResolvedValue(
+        response({
+          jsonrpc: "2.0",
+          id: "cloud",
+          error: { code: -32006, message: "private" },
+        }),
+      ),
+    );
+    expect(await call("workdown.export", {}, true, -32006)).toEqual({
+      status: 200,
+      errorCode: -32006,
+    });
+    await expect(
+      createDeployedRpc(
+        env,
+        vi.fn<typeof fetch>().mockResolvedValue(response(envelope)),
+      )("workdown.export", {}, true, -32006),
+    ).rejects.toThrow(/Expected RPC failure/);
+  });
   it("requires connection credentials and HTTPS before making requests", () => {
     const request = vi.fn<typeof fetch>();
     expect(() => createDeployedRpc({}, request)).toThrow(/WORKDOWN_RPC_URL/);

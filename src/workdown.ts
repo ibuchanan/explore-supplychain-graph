@@ -132,16 +132,34 @@ export const exportWorkdown: HandlerMap<
 >["workdown.export"] = async (params, context) => {
   const { installation, principal } = context;
   if (!params.issue.trim()) return err("invalid-params");
-  const response = await jiraGet(
-    installation,
-    principal.authorization,
-    `issue/${encodeURIComponent(params.issue)}?fields=summary,issuetype,updated,description,status,resolution,priority,labels,created,duedate,project`,
-  );
-  if ([401, 403, 404].includes(response.status)) return err("forbidden");
-  if (!response.ok) return err("internal-error");
-  const issue = (await response.json()) as Epic;
+  let issue: Epic;
+  try {
+    const response = await jiraGet(
+      installation,
+      principal.authorization,
+      `issue/${encodeURIComponent(params.issue)}?fields=summary,issuetype,updated,description,status,resolution,priority,labels,created,duedate,project,security&failFast=true`,
+    );
+    if ([401, 403, 404].includes(response.status)) return err("forbidden");
+    if (!response.ok) return err("eligibility-undetermined");
+    issue = (await response.json()) as Epic;
+    if (!issue?.fields || typeof issue.fields !== "object")
+      return err("eligibility-undetermined");
+  } catch {
+    return err("eligibility-undetermined");
+  }
   if (issue.fields.issuetype.hierarchyLevel !== 1)
     return err("profile-mismatch");
+  const security = issue.fields["security"];
+  if (
+    security &&
+    typeof security === "object" &&
+    "id" in security &&
+    typeof security.id === "string" &&
+    /^\d+$/.test(security.id)
+  )
+    return err("issue-ineligible");
+  if (!Object.hasOwn(issue.fields, "security") || security !== null)
+    return err("eligibility-undetermined");
   if (
     [
       "status",
@@ -154,6 +172,10 @@ export const exportWorkdown: HandlerMap<
     ].some((key) => !Object.hasOwn(issue.fields, key))
   )
     return err("field-unreadable");
+  // Only classic projects have observed secured-item detection; next-gen remains gated.
+  const project = issue.fields["project"] as { simplified?: unknown } | null;
+  if (!project || project.simplified !== false)
+    return err("eligibility-undetermined");
   if (!validScalars(issue.fields)) return err("field-unreadable");
   const mapping = await resolveStartDate(
     context,

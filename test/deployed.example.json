@@ -11,7 +11,7 @@
       "key": "LEO-9",
       "projectType": "team-managed",
       "expected": {
-        "start_date": null
+        "errorCode": -32006
       }
     }
   }

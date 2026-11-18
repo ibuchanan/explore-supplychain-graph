@@ -14,7 +14,8 @@ const epic = {
     issuetype: { name: "Epic", hierarchyLevel: 1 },
     updated: "2026-11-15T10:30:00.000Z",
     description: null as unknown,
-    project: { id: "10000" },
+    security: null as unknown,
+    project: { id: "10000", simplified: false } as unknown,
     status: null as unknown,
     resolution: null as unknown,
     priority: null as unknown,
@@ -543,6 +544,97 @@ describe("workdown.export", () => {
       expect((await call(epic, undefined, status)).error).toEqual({
         code: -32001,
         message: "Forbidden",
+      });
+    },
+  );
+  it("rejects a readable issue-secured Epic without disclosing its content", async () => {
+    const output = vi.spyOn(console, "info").mockImplementation(() => {});
+    try {
+      const response = await call({
+        ...epic,
+        fields: {
+          ...epic.fields,
+          summary: "private-secured-summary",
+          security: { id: "10001", name: "private-security-level" },
+        },
+      });
+      expect(response).toEqual({
+        jsonrpc: "2.0",
+        id: 1,
+        error: { code: -32005, message: "Issue ineligible" },
+      });
+      expect(JSON.stringify(output.mock.calls)).not.toContain("private-");
+    } finally {
+      output.mockRestore();
+    }
+  });
+  it.each([undefined, {}, [], "", { id: 12 }, { id: "" }])(
+    "fails closed when security is absent or ambiguous (case %#)",
+    async (security) => {
+      const response = await call({
+        ...epic,
+        fields: { ...epic.fields, security },
+      });
+      expect(response).toEqual({
+        jsonrpc: "2.0",
+        id: 1,
+        error: { code: -32006, message: "Eligibility undetermined" },
+      });
+    },
+  );
+  it("requests security explicitly and fails fast as the caller", async () => {
+    let checked = false;
+    await call(epic, undefined, 200, [], cloudId, (url) => {
+      if (url.pathname.includes("/issue/")) {
+        expect(url.searchParams.get("fields")?.split(",")).toContain(
+          "security",
+        );
+        expect(url.searchParams.get("failFast")).toBe("true");
+        checked = true;
+      }
+      return undefined;
+    });
+    expect(checked).toBe(true);
+  });
+  it.each([{}, { simplified: true }, { simplified: "false" }])(
+    "does not authorize an unverified project type (case %#)",
+    async (project) => {
+      const response = await call({
+        ...epic,
+        fields: { ...epic.fields, project: { id: "10000", ...project } },
+      });
+      expect(response.error).toEqual({
+        code: -32006,
+        message: "Eligibility undetermined",
+      });
+      expect(response).not.toHaveProperty("result");
+    },
+  );
+  it("classifies a failed eligibility read without exposing response content", async () => {
+    const response = await call(epic, undefined, 200, [], cloudId, (url) =>
+      url.pathname.includes("/issue/")
+        ? new Response("private-upstream-error", { status: 500 })
+        : undefined,
+    );
+    expect(response.error).toEqual({
+      code: -32006,
+      message: "Eligibility undetermined",
+    });
+  });
+  it.each(["transport", "json", "fields"])(
+    "fails closed on an invalid eligibility response (%s)",
+    async (failure) => {
+      const response = await call(epic, undefined, 200, [], cloudId, (url) => {
+        if (!url.pathname.includes("/issue/")) return undefined;
+        if (failure === "transport")
+          throw new Error("private-transport-detail");
+        return failure === "json"
+          ? new Response("private-invalid-json")
+          : Response.json({ fields: null });
+      });
+      expect(response.error).toEqual({
+        code: -32006,
+        message: "Eligibility undetermined",
       });
     },
   );

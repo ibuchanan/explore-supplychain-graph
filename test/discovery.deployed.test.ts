@@ -27,10 +27,23 @@ it("authenticates discovery through the deployed Forge webtrigger", async () => 
 
 for (const [alias, issue] of Object.entries(scenarios.issues)) {
   it(`exports ${alias} (${issue.projectType}) through the deployed Forge webtrigger`, async () => {
-    const response = await call("workdown.export", {
-      profile: "jira-epic",
-      issue: issue.key,
-    });
+    const expectedError =
+      "errorCode" in issue.expected ? issue.expected.errorCode : undefined;
+    const response = await call(
+      "workdown.export",
+      {
+        profile: "jira-epic",
+        issue: issue.key,
+      },
+      true,
+      expectedError,
+    );
+    if ("errorCode" in issue.expected) {
+      expect(response.status).toBe(200);
+      expect(response.errorCode).toBe(issue.expected.errorCode);
+      expect(response).not.toHaveProperty("result");
+      return;
+    }
     expect(response.status).toBe(200);
     expect(validateWorkdown(response.result)).toBe(true);
     const metadata = parse(

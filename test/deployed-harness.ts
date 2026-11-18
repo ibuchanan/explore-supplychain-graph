@@ -7,7 +7,9 @@ export interface DeployedScenarios {
     {
       key: string;
       projectType: "company-managed" | "team-managed";
-      expected: { start_date: string | null };
+      expected:
+        | { start_date: string | null }
+        | { errorCode: -32001 | -32005 | -32006 };
     }
   >;
 }
@@ -31,8 +33,9 @@ const validScenarios = new Ajv().compile<DeployedScenarios>({
           expected: {
             type: "object",
             additionalProperties: false,
-            required: ["start_date"],
+            oneOf: [{ required: ["start_date"] }, { required: ["errorCode"] }],
             properties: {
+              errorCode: { enum: [-32001, -32005, -32006] },
               start_date: {
                 anyOf: [
                   { type: "null" },
@@ -58,9 +61,10 @@ export function parseDeployedScenarios(text: string): DeployedScenarios {
   }
   if (!validScenarios(value))
     throw new Error(
-      "Invalid deployed scenarios: require named issues with key, projectType, and expected.start_date (date or null); content suppressed",
+      "Invalid deployed scenarios: require named issues with key, projectType, and expected.start_date (date or null) or expected.errorCode (-32001, -32005, -32006); content suppressed",
     );
   for (const issue of Object.values(value.issues)) {
+    if (!("start_date" in issue.expected)) continue;
     const date = issue.expected.start_date;
     if (date !== null) {
       const parsed = new Date(`${date}T00:00:00.000Z`);
@@ -114,7 +118,12 @@ export function createDeployedRpc(
     );
   }
   const authorization = `Basic ${Buffer.from(`${required("WORKDOWN_TEST_EMAIL")}:${required("WORKDOWN_TEST_API_TOKEN")}`).toString("base64")}`;
-  return async (method: string, params: unknown, authenticated = true) => {
+  return async (
+    method: string,
+    params: unknown,
+    authenticated = true,
+    expectedErrorCode?: number,
+  ) => {
     let response: Response;
     try {
       response = await request(url, {
@@ -160,10 +169,16 @@ export function createDeployedRpc(
         typeof error.code === "number"
           ? error.code
           : "unknown";
+      if (code === expectedErrorCode && !("result" in envelope))
+        return { status: response.status, errorCode: code };
       throw new Error(
         `Deployed RPC failed with JSON-RPC code ${code}; response content suppressed`,
       );
     }
+    if (expectedErrorCode !== undefined)
+      throw new Error(
+        "Expected RPC failure but received success; response content suppressed",
+      );
     if (!("result" in envelope))
       throw new Error(
         "Missing deployed RPC result; response content suppressed",
