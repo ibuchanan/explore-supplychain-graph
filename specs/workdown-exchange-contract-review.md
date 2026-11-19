@@ -260,6 +260,19 @@ cause of the 401 was not established. Supply a suitably scoped create/edit
 credential securely before retrying. The concurrent changed-content gate remains
 open, not waived by this attempted test. Existing core 4.2.0 evidence still holds.
 
+After the user reported updating Keeper, the 15:52 retry failed earlier: the
+initial Jira issue **GET returned 401**, before any create/edit/Exchange call.
+A separate read-only `/rest/api/3/myself` probe through the tenant-bound
+`api.atlassian.com/ex/jira` route also returned **401**. SecretSpec injected both
+email and token; a boolean-only check found no surrounding token whitespace.
+No token values, lengths, hashes or response bodies were displayed or recorded.
+The mapping remains `WORKDOWN_TEST_API_TOKEN` from `project_secrets` and
+`WORKDOWN_TEST_EMAIL` from `project_config`. Secret presence is not proof of a
+correct Keeper mapping or valid credential. The cause is unresolved (account
+pairing, token validity/scopes or provider value); no secret change, fallback,
+issue mutation, or deployment was attempted. The user must check the configured
+credential securely before the write scenario can proceed.
+
 `npm run check` passes with the new opt-in test excluded from default local runs:
 **209 local tests / 8 files**, Forge lint, freshness/typecheck/build/static/format,
 and **19.95 kB / 32 kB** size check. No deployment or installation was performed.
