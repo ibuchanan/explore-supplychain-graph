@@ -159,5 +159,71 @@ Promoting Ajv alone was insufficient and did not resolve the startup failure.
   transaction. No agent deployment/upgrade was performed; another approved
   development deployment and installed-app run are needed.
 
-Ticket 20 remains open for successful single-installation platform verification.
+### Development 4.2.0 retry — 2026-11-19
+
+The user supplied successful development **4.2.0** deployment output and an
+installation check confirming the site is current. The installed suite reports
+**2 passed / 2 failed / 2 skipped**. The ESM startup failure no longer occurs.
+
+- Authenticated discovery, including unauthenticated rejection and contract
+  comparison, passes. The configured team-managed indeterminate-eligibility
+  rejection also passes; this is not successful team-managed export evidence.
+- The Exchange scenario reaches the retained-description assertion: two
+  concurrent authenticated starts acknowledge the same identity and positive
+  sequence, unauthenticated start/read calls return 401, and the authenticated
+  read returns valid Workdown with the acknowledged identity and sequence.
+  This establishes successful installed-app storage/receipt/read behavior for
+  unchanged concurrent starts, not changed-content races or a non-admin caller.
+- The retained description does not match the configured example. The export
+  scenario separately fails its independent child-list comparison. The local
+  expectations were copied from a checked-in example, not independently
+  confirmed against the current live issue. Neither mismatch establishes an
+  implementation bug or authorizes changing expectations to match export output.
+- Recent sanitized development log readback contains expected 401 outcomes,
+  successful HTTP 200 outcomes, and the expected -32006 rejection. No missing
+  Ajv helper error appears in that readback. No document content was logged.
+- The repeat-start assertion after the description check was not reached.
+  First conditional creation was not independently established; no before-state
+  inspection was performed. Changed-content races, non-admin cloud reads, and
+  actual remote delivery remain unverified.
+- Further shell access was denied. No direct Jira inspection, further test run,
+  local check, or commit was performed after this evidence update. Next steps:
+  independently establish live Jira description/children expectations, rerun the
+  suite, and decide any remaining closure gates without weakening assertions.
+
+### Development 4.2.0 passing run — 2026-11-19
+
+After command access resumed, direct authenticated Jira REST reads independently
+established the current Epic's five plain-text paragraphs and one eligible direct
+child (no security level, not a subtask, company-managed). The ignored scenario
+file was corrected from those reads, with literal punctuation escaped for its
+Markdown context. No Workdown output or app converter was used to generate the
+expected description; no Jira content was changed. The temporary source capture
+was deleted. Live identities and prose remain outside tracked evidence.
+
+- `secretspec run --scope '' -- npm run test:deployed`: **4 passed / 2 skipped**
+  against development **4.2.0**. The two skips are the previously deferred
+  secured/unreadable Epic scenarios, not Exchange success-path skips.
+- The complete Exchange scenario passes: unauthenticated start/read rejection,
+  concurrent unchanged starts returning equal identity and positive sequence,
+  authenticated retained Workdown/identity/sequence/content checks, and a repeat
+  start reusing the retained sequence. Export also passes the independent child,
+  description and populated Start date assertions. Team-managed coverage remains
+  the configured -32006 rejection, not a successful export.
+- Fresh sanitized `forge logs` readback shows successful HTTP 200 invocations,
+  expected unauthenticated 401 outcomes, and the expected -32006 rejection,
+  without document bodies or startup errors in the retrieved window.
+- `npm run check` passes: **209 local tests / 8 files**, contract freshness,
+  typecheck/build, formatting/static checks, Forge lint, and **19.95 kB / 32 kB**
+  bundle size. No production code or deployed test assertions changed in this
+  verification pass. No agent deployment or installation was performed.
+
+The core single-installation loopback flow is cloud verified. Ticket 20's explicit
+**sequence allocation under concurrent changed content** gate remains open;
+unchanged starts do not establish it. First conditional creation was not observed
+from an independently confirmed absent state. Non-admin Project Admin starts and
+destination reads are locally tested, not cloud verified with distinct credentials.
+No source edits, storage deletion, test-only Command, or authentication bypass was
+introduced to manufacture that evidence. Additional controlled fixture work or an
+explicit user decision on the remaining gate is required before full closure.
 Actual cross-installation delivery remains unverified and is not enabled.
