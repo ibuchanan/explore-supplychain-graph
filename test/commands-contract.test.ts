@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { err } from "@forge-ahead/errors";
 import { createDispatcher } from "@forge-ahead/rpc";
@@ -19,6 +20,25 @@ const fixture = (name: string) =>
   );
 
 describe("application Command contract", () => {
+  it("loads generated validators in native ESM and preserves Unicode length validation", () => {
+    expect(() =>
+      execFileSync(
+        process.execPath,
+        [
+          "--input-type=module",
+          "-e",
+          `import assert from 'node:assert/strict';
+           import { outputValidators } from './src/generated/validators.js';
+           const result = { connection: 'development-loopback', loopback: true,
+             document: '😀', updateSequenceNumber: 1, workdown: '😀' };
+           assert.equal(outputValidators['document.get'](result), true);
+           assert.equal(outputValidators['document.get']({ ...result, workdown: '' }), false);`,
+        ],
+        { cwd: new URL("..", import.meta.url), stdio: "pipe" },
+      ),
+    ).not.toThrow();
+  });
+
   it("declares generated validator helpers as production dependencies", () => {
     const manifest = JSON.parse(
       readFileSync(new URL("../package.json", import.meta.url), "utf8"),
@@ -27,7 +47,9 @@ describe("application Command contract", () => {
       new URL("../src/generated/validators.js", import.meta.url),
       "utf8",
     );
-    for (const [, specifier] of validators.matchAll(/require\("([^"]+)"\)/g)) {
+    const helpers = [...validators.matchAll(/(?:require\(|from )"([^"]+)"/g)];
+    expect(helpers.length).toBeGreaterThan(0);
+    for (const [, specifier] of helpers) {
       const dependency = specifier?.startsWith("@")
         ? specifier.split("/").slice(0, 2).join("/")
         : specifier?.split("/")[0];

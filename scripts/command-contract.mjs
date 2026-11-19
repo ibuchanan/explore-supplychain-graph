@@ -90,7 +90,23 @@ export function generateContract(document, source) {
     exports[`input${i}`] = inputs[name];
     exports[`output${i}`] = outputs[name];
   }
-  const code = standaloneCode(ajv, exports);
+  // Ajv emits CommonJS helper loads even with esm:true. Static imports let
+  // Forge bundle those helpers; normalize Node/webpack CommonJS interop.
+  const helpers = new Map();
+  const body = standaloneCode(ajv, exports).replace(
+    /require\("(ajv\/dist\/runtime\/[^\"]+)"\)\.default/g,
+    (_, path) => {
+      if (!helpers.has(path)) helpers.set(path, `helper${helpers.size}`);
+      return helpers.get(path);
+    },
+  );
+  const imports = [...helpers]
+    .map(
+      ([path, name]) =>
+        `import ${name}Module from "${path}.js";\nconst ${name} = ${name}Module.default ?? ${name}Module;\n`,
+    )
+    .join("");
+  const code = imports + body;
   const mapCode = (kind) =>
     `{ ${Object.keys(inputs)
       .map((name, i) => `${JSON.stringify(name)}: ${kind}${i}`)

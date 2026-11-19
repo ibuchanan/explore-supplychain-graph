@@ -135,5 +135,29 @@ scope/upgrade approval gate; it does not establish runtime behavior.
   first conditional creation, concurrent start, retained read, non-admin read,
   or changed-content race was established by this failed cloud attempt.
 
+### Development 4.1.0 retry — 2026-11-19
+
+The user supplied successful development **4.1.0** deployment output and an
+installation check confirming the site is current. The installed suite again
+reported **4 failed / 2 skipped**; recent logs show the same missing Ajv helper.
+Promoting Ajv alone was insufficient and did not resolve the startup failure.
+
+- Ajv's `esm: true` standalone output still contains a CommonJS `require` for
+  its Unicode length helper. The Forge bundle leaves that reference unresolved.
+  A new native-Node ESM import test reproduces the mixed-module failure outside
+  Vitest's transformed loader (`require is not defined`).
+- The Command generator now converts generated Ajv runtime helper references
+  to static ESM imports with explicit `.js` paths and CommonJS default-export
+  normalization. Ajv remains a production dependency. Generated artifacts were
+  regenerated; the OpenRPC contract, scopes, egress, and manifest are unchanged.
+- The native-ESM regression now passes, exercising valid Unicode content and
+  rejection of empty Workdown. The dependency check now inspects static imports
+  as well as requires. **209 local tests / 8 files** and `npm run check` pass;
+  the bundle size is **19.95 kB / 32 kB**. Red/green was observed before/after
+  changing the generator.
+- This is local module-loading evidence, not a successful Forge bundle or cloud
+  transaction. No agent deployment/upgrade was performed; another approved
+  development deployment and installed-app run are needed.
+
 Ticket 20 remains open for successful single-installation platform verification.
 Actual cross-installation delivery remains unverified and is not enabled.
