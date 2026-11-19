@@ -61,6 +61,35 @@ const defaults = () => ({
 });
 
 describe("Exchange business Commands", () => {
+  it("reports acknowledgment storage failure without exposing errors or losing retained content", async () => {
+    const store = memory();
+    const outcomes: unknown[] = [];
+    const commands = createExchangeCommands({
+      ...defaults(),
+      store: {
+        ...store,
+        compareAndSet: async (key, previous, value, publication) => {
+          if (value.publishedSequence)
+            throw new Error("private-storage-diagnostic");
+          return store.compareAndSet(key, previous, value, publication);
+        },
+      },
+      ingest: async () => true,
+      reportPublication: (stage, outcome) => {
+        outcomes.push({ stage, outcome });
+      },
+    });
+    expect(await commands.start(params, context)).toHaveProperty("value");
+    expect(await commands.status(read, context)).toMatchObject({
+      value: { retainedSequence: 1, publishedSequence: null },
+    });
+    expect(outcomes).toEqual([
+      { stage: "acknowledgment-storage", outcome: "exception" },
+    ]);
+    expect(await commands.get(read, context)).toMatchObject({
+      value: { workdown },
+    });
+  });
   it("publishes only acknowledged ingestion and dispatches an identity-only JSON-RPC notification once", async () => {
     const notifications: unknown[] = [];
     const commands = createExchangeCommands({

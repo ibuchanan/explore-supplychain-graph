@@ -1,4 +1,5 @@
 import { getAppContext } from "@forge/api";
+import { createForgeLogger } from "@forge-ahead/logging";
 import {
   createWebDispatcher,
   type OpenRpcDocument,
@@ -16,6 +17,7 @@ import document from "./openrpc.json";
 import { exportWorkdown } from "./workdown";
 import { validateWorkdown } from "./workdown-validation";
 
+const logger = createForgeLogger({ name: "workdown", pretty: false });
 const exchange = createExchangeCommands({
   store: exchangeStore,
   environment: () => {
@@ -29,6 +31,8 @@ const exchange = createExchangeCommands({
   isProjectAdmin,
   ingest: ingestWorkdown,
   notify: dispatchPublication,
+  reportPublication: (stage, outcome) =>
+    logger.info({ stage, outcome }, "workdown.publication"),
 });
 
 export const options: WebOptions<CommandContext> = {

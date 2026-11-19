@@ -3,8 +3,12 @@ import { createGraphConnectionHandler } from "../src/graph";
 
 it("binds the platform-issued connector identity only from a trusted development lifecycle and clears it on deletion", async () => {
   const records = new Map<string, string>();
+  const outcomes: string[] = [];
   const handler = createGraphConnectionHandler({
     environment: () => "DEVELOPMENT",
+    report: (outcome) => {
+      outcomes.push(outcome);
+    },
     set: async (key, value) => {
       records.set(key, value);
     },
@@ -30,4 +34,11 @@ it("binds the platform-issued connector identity only from a trusted development
   expect(
     await handler({ action: "CREATED", connectionId: "graph-id" }, {}),
   ).toEqual({ success: false });
+  expect(outcomes).toEqual([
+    "bound",
+    "binding-conflict",
+    "deletion-ignored",
+    "deleted",
+    "invalid-context",
+  ]);
 });

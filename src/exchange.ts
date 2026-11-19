@@ -37,6 +37,14 @@ export type PublicationNotification = {
 type PublicationDependencies = {
   ingest?: (record: RetainedDocument, binding: Binding) => Promise<boolean>;
   notify?: (notification: PublicationNotification) => Promise<void>;
+  reportPublication?: (
+    stage:
+      | "ingestion"
+      | "acknowledgment-storage"
+      | "notification"
+      | "notification-storage",
+    outcome: "recorded" | "conflict" | "exception",
+  ) => void;
 };
 type Receipt = (
   candidate: RetainedDocument,
@@ -93,12 +101,16 @@ export function createLoopbackReceiver(
     binding: Binding,
     storageKey: string,
   ) {
+    let stage: Parameters<
+      NonNullable<PublicationDependencies["reportPublication"]>
+    >[0] = "ingestion";
     try {
       if (
         record.notificationPending &&
         record.publishedSequence !== record.updateSequenceNumber
       ) {
         if (!publication.notify) return;
+        stage = "notification";
         await publication.notify({
           jsonrpc: "2.0",
           method: "publication.published",
@@ -110,6 +122,7 @@ export function createLoopbackReceiver(
           },
         });
         const next = { ...record, notificationPending: false };
+        stage = "notification-storage";
         if (
           !(await store.compareAndSet(
             storageKey,
@@ -117,13 +130,17 @@ export function createLoopbackReceiver(
             next,
             { sequence: record.publishedSequence, pending: true },
           ))
-        )
+        ) {
+          publication.reportPublication?.(stage, "conflict");
           return;
+        }
         record = next;
       }
       if (record.publishedSequence !== record.updateSequenceNumber) {
+        stage = "ingestion";
         if (!publication.ingest || !(await publication.ingest(record, binding)))
           return;
+        stage = "acknowledgment-storage";
         const next = {
           ...record,
           publishedSequence: record.updateSequenceNumber,
@@ -139,11 +156,15 @@ export function createLoopbackReceiver(
               pending: record.notificationPending,
             },
           ))
-        )
+        ) {
+          publication.reportPublication?.(stage, "conflict");
           return;
+        }
+        publication.reportPublication?.(stage, "recorded");
         record = next;
       }
       if (record.notificationPending && publication.notify) {
+        stage = "notification";
         await publication.notify({
           jsonrpc: "2.0",
           method: "publication.published",
@@ -154,14 +175,20 @@ export function createLoopbackReceiver(
             updateSequenceNumber: record.updateSequenceNumber,
           },
         });
-        await store.compareAndSet(
+        stage = "notification-storage";
+        const recorded = await store.compareAndSet(
           storageKey,
           record.updateSequenceNumber,
           { ...record, notificationPending: false },
           { sequence: record.publishedSequence, pending: true },
         );
+        publication.reportPublication?.(
+          stage,
+          recorded ? "recorded" : "conflict",
+        );
       }
     } catch {
+      publication.reportPublication?.(stage, "exception");
       // Destination acceptance survives ingestion or notification failure.
       // Pending notification state permits at-least-once retry without reingestion.
     }
