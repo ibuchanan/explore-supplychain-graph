@@ -512,3 +512,18 @@ retention of the previous successful document on failure belong to the Exchange 
 
 Source-specific test suites, fixtures, and acceptance gates are documented in
 companion profiles; see [Source profiles](#source-profiles).
+
+### Ingestion implementation evidence — 2026-11-19
+
+The local destination adapter submits the full canonical Workdown, including
+Frontmatter, as `atlassian:document` content with `mimeType: text/plain`.
+This is the documented candidate representation, not verified service acceptance
+or a claim of Markdown rendering or structured Frontmatter indexing. Publication
+status advances only after a matching accepted-object acknowledgment with no
+rejections; retained bytes remain readable when ingestion fails.
+
+The 256 KiB document and 100-child limits remain provisional. Local storage
+round-trip tests cover the byte bound; deployed TWG acceptance, Search timing,
+Frontmatter preservation, deletion, worst-case payloads, and local viewer safety
+are outstanding. See [Publication implementation and verification](workdown-publication-verification.md)
+for the permission review, official references, evidence, and remaining gates.

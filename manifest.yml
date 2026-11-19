@@ -1,4 +1,19 @@
 modules:
+  graph:connector:
+    - key: workdown-documents
+      name: Workdown
+      capabilities:
+        replicatesPermissions: false
+        syncFidelity: upsert
+        supportsIncrementalSync: true
+      icons:
+        light: https://developer.atlassian.com/platform/forge/images/icons/issue-panel-icon.svg
+        dark: https://developer.atlassian.com/platform/forge/images/icons/issue-panel-icon.svg
+      objectTypes:
+        - atlassian:document
+      datasource:
+        onConnectionChange:
+          function: graph-connection
   webtrigger:
     - key: explore-supplychain-graph-webtrigger-sync
       function: sync
@@ -15,6 +30,8 @@ modules:
       response:
         type: dynamic
   function:
+    - key: graph-connection
+      handler: graph.onGraphConnectionChange
     - key: sync
       handler: index.runSync
     - key: async
@@ -22,6 +39,7 @@ modules:
 permissions:
   scopes:
     - storage:app
+    - write:object:jira
   external:
     fetch:
       backend:
@@ -35,6 +53,8 @@ app:
             type: string
           payload:
             type: any
+          publication:
+            type: string
   runtime:
     name: nodejs24.x
     memoryMB: 256

@@ -20,6 +20,50 @@ const fixture = (name: string) =>
   );
 
 describe("application Command contract", () => {
+  it("declares latest-only Publication status and its identity-only JSON-RPC notification", () => {
+    const method = commands.methods.find(
+      (method) => method.name === "publication.status",
+    );
+    expect(method?.examples.map((example) => example.result.value)).toEqual([
+      {
+        connection: "development-loopback",
+        loopback: true,
+        document:
+          "ari:cloud:jira:00000000-0000-4000-8000-000000000001:issue/10042",
+        retainedSequence: 2,
+        publishedSequence: 2,
+      },
+      {
+        connection: "development-loopback",
+        loopback: true,
+        document:
+          "ari:cloud:jira:00000000-0000-4000-8000-000000000001:issue/10042",
+        retainedSequence: 3,
+        publishedSequence: 2,
+      },
+      {
+        connection: "development-loopback",
+        loopback: true,
+        document:
+          "ari:cloud:jira:00000000-0000-4000-8000-000000000001:issue/10043",
+        retainedSequence: 1,
+        publishedSequence: null,
+      },
+    ]);
+    expect(commands["x-events"]?.[0]).toMatchObject({
+      name: "publication.published",
+      description: expect.stringContaining("JSON-RPC 2.0 notification"),
+      payload: {
+        required: [
+          "connection",
+          "loopback",
+          "document",
+          "updateSequenceNumber",
+        ],
+        additionalProperties: false,
+      },
+    });
+  });
   it("loads generated validators in native ESM and preserves Unicode length validation", () => {
     expect(() =>
       execFileSync(
@@ -105,6 +149,7 @@ describe("application Command contract", () => {
       "workdown.export",
       "exchange.start",
       "document.get",
+      "publication.status",
     ]);
   });
 

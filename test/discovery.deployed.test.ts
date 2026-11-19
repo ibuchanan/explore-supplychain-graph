@@ -111,6 +111,27 @@ for (const [alias, issue] of Object.entries(scenarios.issues)) {
       expect(
         retained.workdown.includes(`## Description\n\n${expectedDescription}`),
       ).toBe(true);
+      const statusParams = {
+        connection: params.connection,
+        document: first.document,
+      };
+      expect(
+        (await call("publication.status", statusParams, false)).status,
+      ).toBe(401);
+      const status = await call("publication.status", statusParams);
+      expect(status.result).toMatchObject({
+        ...statusParams,
+        loopback: true,
+        retainedSequence: retained.updateSequenceNumber,
+      });
+      const published = (status.result as { publishedSequence: number | null })
+        .publishedSequence;
+      expect(
+        published === null ||
+          (Number.isSafeInteger(published) &&
+            published > 0 &&
+            published <= retained.updateSequenceNumber),
+      ).toBe(true);
       const repeated = await call("exchange.start", params);
       expect(
         (repeated.result as typeof first).updateSequenceNumber ===

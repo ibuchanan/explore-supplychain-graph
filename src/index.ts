@@ -37,7 +37,8 @@ const handle: typeof adminHandle = async (request, context) => {
     /* Malformed requests retain the existing admin admission policy. */
   }
   const response = await (method === "exchange.start" ||
-    method === "document.get"
+    method === "document.get" ||
+    method === "publication.status"
     ? authenticatedHandle
     : adminHandle)(request, context);
   if (method === "rpc.discover" && response.statusCode === 200)

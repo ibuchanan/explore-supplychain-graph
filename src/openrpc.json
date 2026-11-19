@@ -359,6 +359,165 @@
           }
         }
       ]
+    },
+    {
+      "name": "publication.status",
+      "summary": "Read the latest Publication of a retained Workdown at the destination",
+      "description": "Read-only. Authenticate a reader within the destination installation's site boundary, exactly as document.get does: no source-site access, Project Admin authority, or destination project is required, and the Connection and document are resolved only within the trusted local installation. An unknown, wrong-direction, pending, revoked, or unavailable incoming Connection yields Connection unavailable without state details. A missing or withdrawn document yields Document unavailable. A Publication exists only after destination acceptance and acknowledged TWG ingestion of that update, and is identified by Connection, document and updateSequenceNumber; it has no separate ID. An accepted update whose ingestion has not been acknowledged, or was rejected, is not yet a Publication and is reported only by its absence. The destination is latest-only: this reports the sequence currently retained and the latest sequence whose ingestion was acknowledged, with no per-sequence query and no history. publishedSequence is null until the first acknowledged ingestion and is never greater than retainedSequence; when it is lower or null, the retained update is not yet a Publication. An HTTP success containing a rejected object is not an acknowledgment. Both sequences come from one consistent read. Status never implies Search visibility, peer delivery, webhook delivery, or that a Flow ran, and returns no document content, TWG diagnostics, or rejection details. Storage failure never masquerades as a missing document.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "connection",
+          "description": "Destination-local incoming Connection context, not a site URL.",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/ConnectionId"
+          }
+        },
+        {
+          "name": "document",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/DocumentId"
+          }
+        }
+      ],
+      "result": {
+        "name": "Publication status",
+        "schema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "connection",
+            "loopback",
+            "document",
+            "retainedSequence",
+            "publishedSequence"
+          ],
+          "properties": {
+            "connection": {
+              "$ref": "#/components/schemas/ConnectionId"
+            },
+            "loopback": {
+              "type": "boolean"
+            },
+            "document": {
+              "$ref": "#/components/schemas/DocumentId"
+            },
+            "retainedSequence": {
+              "$ref": "#/components/schemas/UpdateSequenceNumber"
+            },
+            "publishedSequence": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/UpdateSequenceNumber"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "code": -32602,
+          "message": "Invalid params"
+        },
+        {
+          "code": -32001,
+          "message": "Forbidden"
+        },
+        {
+          "code": -32010,
+          "message": "Connection unavailable"
+        },
+        {
+          "code": -32012,
+          "message": "Storage unavailable"
+        },
+        {
+          "code": -32013,
+          "message": "Document unavailable"
+        }
+      ],
+      "x-forge-ahead": {
+        "web": true,
+        "execution": "asApp",
+        "audit": "standard"
+      },
+      "examples": [
+        {
+          "name": "Current retained update is a Publication",
+          "params": [
+            {
+              "name": "connection",
+              "value": "development-loopback"
+            },
+            {
+              "name": "document",
+              "value": "ari:cloud:jira:00000000-0000-4000-8000-000000000001:issue/10042"
+            }
+          ],
+          "result": {
+            "name": "Publication status",
+            "value": {
+              "connection": "development-loopback",
+              "loopback": true,
+              "document": "ari:cloud:jira:00000000-0000-4000-8000-000000000001:issue/10042",
+              "retainedSequence": 2,
+              "publishedSequence": 2
+            }
+          }
+        },
+        {
+          "name": "Newer retained update not yet a Publication",
+          "params": [
+            {
+              "name": "connection",
+              "value": "development-loopback"
+            },
+            {
+              "name": "document",
+              "value": "ari:cloud:jira:00000000-0000-4000-8000-000000000001:issue/10042"
+            }
+          ],
+          "result": {
+            "name": "Publication status",
+            "value": {
+              "connection": "development-loopback",
+              "loopback": true,
+              "document": "ari:cloud:jira:00000000-0000-4000-8000-000000000001:issue/10042",
+              "retainedSequence": 3,
+              "publishedSequence": 2
+            }
+          }
+        },
+        {
+          "name": "Accepted but no Publication yet",
+          "params": [
+            {
+              "name": "connection",
+              "value": "development-loopback"
+            },
+            {
+              "name": "document",
+              "value": "ari:cloud:jira:00000000-0000-4000-8000-000000000001:issue/10043"
+            }
+          ],
+          "result": {
+            "name": "Publication status",
+            "value": {
+              "connection": "development-loopback",
+              "loopback": true,
+              "document": "ari:cloud:jira:00000000-0000-4000-8000-000000000001:issue/10043",
+              "retainedSequence": 1,
+              "publishedSequence": null
+            }
+          }
+        }
+      ]
     }
   ],
   "components": {
@@ -381,5 +540,47 @@
         "description": "Positive JSON safe integer, monotonically increasing per Connection/document. Unchanged canonical bytes reuse the sequence; retries reuse bytes and sequence. Gaps are allowed. Not a timestamp or historical-version selector. Exhaustion must fail without wrapping."
       }
     }
-  }
+  },
+  "x-events": [
+    {
+      "name": "publication.published",
+      "summary": "A Publication occurred at the destination",
+      "description": "Emitted destination-locally once, after destination acceptance and acknowledged TWG ingestion of an update. Not emitted for unchanged content, stale or duplicate receipts, rejected ingestion, or an update superseded before acknowledgment is recorded. Carries identity only: no Workdown content, source data, or TWG diagnostics. Consumers retrieve the latest content with document.get, which may return a later sequence than the event's; that is valid. Delivery is at-least-once; consumers deduplicate on connection, document and updateSequenceNumber. This is a JSON-RPC 2.0 notification (method publication.published, params carrying this payload, no id), not a Forge App Event or a native Automation Flows trigger; no such trigger is claimed. It implies neither Search visibility nor webhook delivery.",
+      "payload": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "connection",
+          "loopback",
+          "document",
+          "updateSequenceNumber"
+        ],
+        "properties": {
+          "connection": {
+            "$ref": "#/components/schemas/ConnectionId"
+          },
+          "loopback": {
+            "type": "boolean"
+          },
+          "document": {
+            "$ref": "#/components/schemas/DocumentId"
+          },
+          "updateSequenceNumber": {
+            "$ref": "#/components/schemas/UpdateSequenceNumber"
+          }
+        }
+      },
+      "examples": [
+        {
+          "name": "Loopback Publication",
+          "value": {
+            "connection": "development-loopback",
+            "loopback": true,
+            "document": "ari:cloud:jira:00000000-0000-4000-8000-000000000001:issue/10042",
+            "updateSequenceNumber": 2
+          }
+        }
+      ]
+    }
+  ]
 }

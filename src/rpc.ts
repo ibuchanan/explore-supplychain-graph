@@ -9,6 +9,7 @@ import { createExchangeCommands } from "./exchange";
 import { exchangeStore } from "./exchange-storage";
 import { webPolicy } from "./generated/policy";
 import { inputValidators, outputValidators } from "./generated/validators.js";
+import { dispatchPublication, ingestWorkdown } from "./graph";
 import type { CommandContext } from "./jira";
 import { isProjectAdmin } from "./jira";
 import document from "./openrpc.json";
@@ -26,6 +27,8 @@ const exchange = createExchangeCommands({
   },
   generate: exportWorkdown,
   isProjectAdmin,
+  ingest: ingestWorkdown,
+  notify: dispatchPublication,
 });
 
 export const options: WebOptions<CommandContext> = {
@@ -35,6 +38,7 @@ export const options: WebOptions<CommandContext> = {
     "workdown.export": exportWorkdown,
     "exchange.start": exchange.start,
     "document.get": exchange.get,
+    "publication.status": exchange.status,
   },
   inputValidators,
   outputValidators: {
@@ -47,6 +51,7 @@ export const options: WebOptions<CommandContext> = {
     "workdown.export": "asUser",
     "exchange.start": "asUser",
     "document.get": "asApp",
+    "publication.status": "asApp",
   }),
   authorize: () => true,
   // The handler uses the same Jira-verified credential, never Forge impersonation.

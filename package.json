@@ -46,6 +46,7 @@
     "@forge-ahead/rpc": "github:ibuchanan/forge-ahead-rpc",
     "@forge/api": "^8.5.0",
     "@forge/kvs": "^2.1.2",
+    "@forge/teamwork-graph": "^5.4.0",
     "ajv": "^8.20.0",
     "yaml": "^2.9.1"
   },

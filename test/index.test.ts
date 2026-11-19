@@ -10,40 +10,43 @@ const context = {
 };
 
 describe.each([runSync, runAsync])("authenticated webtrigger", (handler) => {
-  it("admits an authenticated destination reader without Jira admin permission", async () => {
-    vi.stubGlobal("fetch", async (url: string) => {
-      if (url.endsWith("/myself"))
-        return Response.json({
-          accountId: "reader",
-          active: true,
-          accountType: "atlassian",
-        });
-      throw new Error(
-        "A destination read must not request source or admin permissions",
-      );
-    });
-    const response = await handler(
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": ["application/json"],
-          Authorization: ["Basic dGVzdDpmYWtl"],
+  it.each(["document.get", "publication.status"])(
+    "admits an authenticated destination reader for %s without Jira admin permission",
+    async (method) => {
+      vi.stubGlobal("fetch", async (url: string) => {
+        if (url.endsWith("/myself"))
+          return Response.json({
+            accountId: "reader",
+            active: true,
+            accountType: "atlassian",
+          });
+        throw new Error(
+          "A destination read must not request source or admin permissions",
+        );
+      });
+      const response = await handler(
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": ["application/json"],
+            Authorization: ["Basic dGVzdDpmYWtl"],
+          },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: 1,
+            method,
+            params: { connection: "not-active", document: "unknown" },
+          }),
         },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "document.get",
-          params: { connection: "not-active", document: "unknown" },
-        }),
-      },
-      context,
-    );
-    expect(response.statusCode).toBe(200);
-    expect(JSON.parse(response.body).error).toEqual({
-      code: -32010,
-      message: "Connection unavailable",
-    });
-  });
+        context,
+      );
+      expect(response.statusCode).toBe(200);
+      expect(JSON.parse(response.body).error).toEqual({
+        code: -32010,
+        message: "Connection unavailable",
+      });
+    },
+  );
   it.each(["DEMO-42", "10042"])(
     "rechecks Project Admin authority for start using %s",
     async (issue) => {

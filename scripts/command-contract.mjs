@@ -12,6 +12,8 @@ export function generateContract(document, source) {
       if (!schemas[name]) throw new Error(`Unknown schema: ${schema.$ref}`);
       return type(schemas[name]);
     }
+    if (schema.oneOf) return schema.oneOf.map(type).join(" | ");
+    if (schema.type === "null") return "null";
     if (schema.enum)
       return schema.enum.map((v) => JSON.stringify(v)).join(" | ");
     switch (schema.type) {
@@ -90,11 +92,30 @@ export function generateContract(document, source) {
     exports[`input${i}`] = inputs[name];
     exports[`output${i}`] = outputs[name];
   }
+  const notificationSchema = JSON.parse(
+    JSON.stringify({
+      type: "object",
+      additionalProperties: false,
+      required: ["jsonrpc", "method", "params"],
+      properties: {
+        jsonrpc: { const: "2.0" },
+        method: { const: "publication.published" },
+        params: document["x-events"][0].payload,
+      },
+      definitions: schemas,
+    }).replaceAll("#/components/schemas/", "#/definitions/"),
+  );
+  ajv.addSchema({
+    ...notificationSchema,
+    $id: "urn:workdown:publication-notification",
+  });
+  exports.validatePublicationNotification =
+    "urn:workdown:publication-notification";
   // Ajv emits CommonJS helper loads even with esm:true. Static imports let
   // Forge bundle those helpers; normalize Node/webpack CommonJS interop.
   const helpers = new Map();
   const body = standaloneCode(ajv, exports).replace(
-    /require\("(ajv\/dist\/runtime\/[^\"]+)"\)\.default/g,
+    /require\("(ajv\/dist\/runtime\/[^"]+)"\)\.default/g,
     (_, path) => {
       if (!helpers.has(path)) helpers.set(path, `helper${helpers.size}`);
       return helpers.get(path);
@@ -115,6 +136,6 @@ export function generateContract(document, source) {
     contract: `${header}import type { Result } from "@forge-ahead/errors";\nexport interface Commands {\n${commands.join("\n")}\n}\nexport type HandlerMap<Context, Failure> = { [M in keyof Commands]: (params: Commands[M]["params"], context: Context) => Promise<Result<Commands[M]["result"], Failure>> };\nexport type Caller = <M extends keyof Commands>(method: M, params: Commands[M]["params"]) => Promise<Commands[M]["result"]>;\n`,
     policy: `${header}export const webPolicy = ${JSON.stringify(policies, null, 2)} as const;\n`,
     validators: `${header}${code}\nexport const inputValidators = ${mapCode("input")};\nexport const outputValidators = ${mapCode("output")};\n`,
-    declarations: `${header}import type { Commands } from "./contract";\ntype Validate<T> = (value: unknown) => value is T;\nexport const inputValidators: { [M in keyof Commands]: Validate<Commands[M]["params"]> };\nexport const outputValidators: { [M in keyof Commands]: Validate<Commands[M]["result"]> };\n`,
+    declarations: `${header}export const validatePublicationNotification: (value: unknown) => boolean;\nimport type { Commands } from "./contract";\ntype Validate<T> = (value: unknown) => value is T;\nexport const inputValidators: { [M in keyof Commands]: Validate<Commands[M]["params"]> };\nexport const outputValidators: { [M in keyof Commands]: Validate<Commands[M]["result"]> };\n`,
   };
 }

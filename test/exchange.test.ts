@@ -25,8 +25,14 @@ function memory(): ExchangeStore {
     async read(key) {
       return records.get(key);
     },
-    async compareAndSet(key, previous, value) {
-      if ((records.get(key)?.updateSequenceNumber ?? 0) !== previous)
+    async compareAndSet(key, previous, value, publication) {
+      const current = records.get(key);
+      if ((current?.updateSequenceNumber ?? 0) !== previous) return false;
+      if (
+        publication &&
+        (current?.publishedSequence !== publication.sequence ||
+          current?.notificationPending !== publication.pending)
+      )
         return false;
       records.set(key, structuredClone(value));
       return true;
@@ -55,6 +61,193 @@ const defaults = () => ({
 });
 
 describe("Exchange business Commands", () => {
+  it("publishes only acknowledged ingestion and dispatches an identity-only JSON-RPC notification once", async () => {
+    const notifications: unknown[] = [];
+    const commands = createExchangeCommands({
+      ...defaults(),
+      ingest: async () => true,
+      notify: async (notification) => {
+        notifications.push(notification);
+      },
+    });
+    await commands.start(params, context);
+    expect(await commands.status(read, context)).toEqual({
+      value: {
+        ...read,
+        loopback: true,
+        retainedSequence: 1,
+        publishedSequence: 1,
+      },
+    });
+    await commands.start(params, context);
+    expect(notifications).toEqual([
+      {
+        jsonrpc: "2.0",
+        method: "publication.published",
+        params: { ...read, loopback: true, updateSequenceNumber: 1 },
+      },
+    ]);
+    expect(await commands.get(read, context)).toEqual({
+      value: { ...read, loopback: true, updateSequenceNumber: 1, workdown },
+    });
+  });
+  it("does not publish a superseded acknowledgment or regress the latest retained sequence", async () => {
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let entered = () => {};
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    let bytes = workdown;
+    const notifications: unknown[] = [];
+    const commands = createExchangeCommands({
+      ...defaults(),
+      generate: async () => ok(bytes),
+      ingest: async (record) => {
+        if (record.updateSequenceNumber === 1) {
+          entered();
+          await gate;
+        }
+        return true;
+      },
+      notify: async (event) => {
+        notifications.push(event);
+      },
+    });
+    const first = commands.start(params, context);
+    await started;
+    bytes = workdown.replace("No description provided.", "Newer description.");
+    await commands.start(params, context);
+    release();
+    await first;
+    expect(await commands.status(read, context)).toMatchObject({
+      value: { retainedSequence: 2, publishedSequence: 2 },
+    });
+    expect(notifications).toEqual([
+      {
+        jsonrpc: "2.0",
+        method: "publication.published",
+        params: { ...read, loopback: true, updateSequenceNumber: 2 },
+      },
+    ]);
+  });
+  it("retains a rejected newer update without inventing a Publication and retries pending notification independently", async () => {
+    let bytes = workdown;
+    let acknowledged = true;
+    let notifyFails = true;
+    let ingestions = 0;
+    const delivered: number[] = [];
+    const commands = createExchangeCommands({
+      ...defaults(),
+      generate: async () => ok(bytes),
+      ingest: async () => {
+        ingestions++;
+        return acknowledged;
+      },
+      notify: async (event) => {
+        if (notifyFails) throw new Error("consumer offline");
+        delivered.push(event.params.updateSequenceNumber);
+      },
+    });
+    await commands.start(params, context);
+    expect(await commands.status(read, context)).toMatchObject({
+      value: { retainedSequence: 1, publishedSequence: 1 },
+    });
+    notifyFails = false;
+    await commands.start(params, context);
+    expect(ingestions).toBe(1);
+    expect(delivered).toEqual([1]);
+    acknowledged = false;
+    bytes = workdown.replace("No description provided.", "Not yet ingested.");
+    await commands.start(params, context);
+    expect(await commands.status(read, context)).toMatchObject({
+      value: { retainedSequence: 2, publishedSequence: 1 },
+    });
+    expect(await commands.get(read, context)).toMatchObject({
+      value: { workdown: bytes },
+    });
+    expect(delivered).toEqual([1]);
+    acknowledged = true;
+    await Promise.all([
+      commands.start(params, context),
+      commands.start(params, context),
+    ]);
+    expect(await commands.status(read, context)).toMatchObject({
+      value: { retainedSequence: 2, publishedSequence: 2 },
+    });
+    expect(delivered).toEqual([1, 2]);
+  });
+  it("does not discard a failed Publication notification when newer content is retained", async () => {
+    let fail = true;
+    let bytes = workdown;
+    const sequences: number[] = [];
+    const commands = createExchangeCommands({
+      ...defaults(),
+      generate: async () => ok(bytes),
+      ingest: async () => true,
+      notify: async (event) => {
+        if (fail) throw new Error("offline");
+        sequences.push(event.params.updateSequenceNumber);
+      },
+    });
+    await commands.start(params, context);
+    bytes = workdown.replace("No description provided.", "New content.");
+    await commands.start(params, context);
+    fail = false;
+    await commands.start(params, context);
+    expect(sequences).toEqual([1, 2]);
+  });
+  it("keeps status destination-authenticated, installation-scoped, and fails closed on storage errors", async () => {
+    const commands = createExchangeCommands(defaults());
+    expect(await commands.status(read, context)).toEqual({
+      error: "document-unavailable",
+    });
+    expect(
+      await commands.status(read, {
+        ...context,
+        principal: { accountId: "", authorization: "" },
+      }),
+    ).toEqual({ error: "forbidden" });
+    expect(
+      await commands.status({ ...read, connection: "revoked" }, context),
+    ).toEqual({ error: "connection-unavailable" });
+    await commands.start(params, context);
+    expect(
+      await commands.status(read, {
+        ...context,
+        installation: {
+          ...context.installation,
+          cloudId: "00000000-0000-4000-8000-000000000002",
+        },
+      }),
+    ).toEqual({ error: "document-unavailable" });
+    const failed = createExchangeCommands({
+      ...defaults(),
+      store: {
+        ...memory(),
+        read: async () => {
+          throw new Error("private diagnostics");
+        },
+      },
+    });
+    expect(await failed.status(read, context)).toEqual({
+      error: "storage-unavailable",
+    });
+  });
+  it("reports accepted content as unpublished until TWG acknowledges it", async () => {
+    const commands = createExchangeCommands(defaults());
+    await commands.start(params, context);
+    expect(await commands.status(read, context)).toEqual({
+      value: {
+        ...read,
+        loopback: true,
+        retainedSequence: 1,
+        publishedSequence: null,
+      },
+    });
+  });
   it("serves both Commands through validated dispatcher inputs and outputs", async () => {
     const business = createExchangeCommands(defaults());
     const dispatch = createWebDispatcher({
@@ -63,6 +256,7 @@ describe("Exchange business Commands", () => {
         ...options.handlers,
         "exchange.start": business.start,
         "document.get": business.get,
+        "publication.status": business.status,
       },
     }).dispatch;
     expect(
@@ -78,6 +272,19 @@ describe("Exchange business Commands", () => {
       ),
     ).toMatchObject({
       result: { document, workdown, updateSequenceNumber: 1 },
+    });
+    expect(
+      await dispatch(
+        { jsonrpc: "2.0", id: 3, method: "publication.status", params: read },
+        context,
+      ),
+    ).toMatchObject({
+      result: {
+        ...read,
+        loopback: true,
+        retainedSequence: 1,
+        publishedSequence: null,
+      },
     });
     expect(
       await dispatch(

@@ -38,14 +38,23 @@ vi.mock("@forge/kvs", async (original) => {
             for (const write of writes) {
               if (!write.conditions) continue;
               const filters = write.conditions.filters();
-              const text = JSON.stringify(filters);
-              const current = state.records.get(write.key);
-              if (
-                text.includes("NOT_EXISTS")
-                  ? !!current
-                  : !current || !text.includes(`"${current.version}"`)
-              )
-                throw new Error("condition failed");
+              const current = state.records.get(write.key) as
+                | Record<string, unknown>
+                | undefined;
+              for (const raw of filters) {
+                const filter = raw as unknown as {
+                  property: string;
+                  condition: string;
+                  values: unknown[];
+                };
+                const actual = current?.[filter.property];
+                if (
+                  filter.condition === "NOT_EXISTS"
+                    ? actual !== undefined
+                    : actual !== filter.values[0]
+                )
+                  throw new Error("condition failed");
+              }
             }
             expect(writes).toHaveLength(5);
             for (const write of writes) {
@@ -75,6 +84,55 @@ const record: RetainedDocument = {
   updateSequenceNumber: 1,
   workdown: "😀".repeat(65536),
 };
+it("persists publication metadata with atomic guards and carries it across newer receipts", async () => {
+  await exchangeStore.compareAndSet("publication", 0, record);
+  const published = {
+    ...record,
+    publishedSequence: 1,
+    notificationPending: true,
+  };
+  expect(
+    await exchangeStore.compareAndSet("publication", 1, published, {}),
+  ).toBe(true);
+  expect(await exchangeStore.read("publication")).toEqual(published);
+  expect(
+    await exchangeStore.compareAndSet("publication", 1, published, {}),
+  ).toBe(false);
+  expect(
+    await exchangeStore.compareAndSet(
+      "publication",
+      1,
+      { ...published, notificationPending: false },
+      { sequence: 1, pending: true },
+    ),
+  ).toBe(true);
+  await exchangeStore.compareAndSet("publication", 1, {
+    ...published,
+    updateSequenceNumber: 2,
+    notificationPending: false,
+  });
+  expect(
+    await exchangeStore.compareAndSet("publication", 1, published, {
+      sequence: 1,
+      pending: false,
+    }),
+  ).toBe(false);
+  expect(await exchangeStore.read("publication")).toMatchObject({
+    updateSequenceNumber: 2,
+    publishedSequence: 1,
+  });
+});
+it("rejects corrupt publication metadata rather than exposing a false acknowledgment", async () => {
+  await exchangeStore.compareAndSet("corrupt", 0, record);
+  const metadata = [...state.records.values()].find(
+    (value) => typeof value.payload === "object",
+  );
+  if (!metadata) throw new Error("Missing metadata fixture");
+  metadata.payload = { document: record.document, publishedSequence: 2 };
+  await expect(exchangeStore.read("corrupt")).rejects.toThrow(
+    "Invalid publication metadata",
+  );
+});
 it("atomically round-trips the full UTF-8 export bound and rejects a stale writer", async () => {
   expect(await exchangeStore.compareAndSet("scoped identity", 0, record)).toBe(
     true,
