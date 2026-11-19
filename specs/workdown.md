@@ -45,7 +45,7 @@ Define Workdown as Markdown with Frontmatter designed for work items. Supplychai
 5. Decide whether comments, attachments, restricted content, and other potentially sensitive material are excluded or represented; none is implicitly included by this outline.
 6. Define missing/unavailable-field and partial-read behavior so failures cannot silently broaden disclosure.
 7. Define deterministic ordering and normalization, content-change comparison, and document size/truncation behavior.
-8. Map included content changes to Jira event coverage, including how relevant child events locate affected Subjects. This must align with event-only freshness.
+8. Map included content changes to Jira product event coverage, including how relevant child events locate affected Subjects. This must align with event-only freshness.
 9. Verify which TWG content MIME type preserves the intended Markdown/Frontmatter representation.
 
 ## Testing Decisions

@@ -541,7 +541,7 @@
       }
     }
   },
-  "x-events": [
+  "x-notifications": [
     {
       "name": "publication.published",
       "summary": "A Publication occurred at the destination",

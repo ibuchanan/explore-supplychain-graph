@@ -50,7 +50,8 @@ describe("application Command contract", () => {
         publishedSequence: null,
       },
     ]);
-    expect(commands["x-events"]?.[0]).toMatchObject({
+    expect(commands).not.toHaveProperty("x-events");
+    expect(commands["x-notifications"]?.[0]).toMatchObject({
       name: "publication.published",
       description: expect.stringContaining("JSON-RPC 2.0 notification"),
       payload: {

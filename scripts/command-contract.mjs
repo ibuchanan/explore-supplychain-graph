@@ -100,7 +100,7 @@ export function generateContract(document, source) {
       properties: {
         jsonrpc: { const: "2.0" },
         method: { const: "publication.published" },
-        params: document["x-events"][0].payload,
+        params: document["x-notifications"][0].payload,
       },
       definitions: schemas,
     }).replaceAll("#/components/schemas/", "#/definitions/"),

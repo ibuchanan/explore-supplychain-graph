@@ -12,9 +12,9 @@ Wonder demonstrated the value of a cross-site Teamwork Graph (TWG) share. Explor
 
 Site Admins mutually authorize a one-way Peer Connection. Source Project Admins initiate ongoing Exchanges for selected Epics over that Connection, without per-Exchange destination approval. Sharing in the reverse direction requires a separate Connection.
 
-The app immediately converts each Subject's curated Jira context into one Workdown document, then keeps it current through source events. Workdown is Markdown with Frontmatter; supported fields and treatment of children are fixed conventions, not administrator configuration.
+The app immediately converts each Subject's curated Jira context into one Workdown document, then keeps it current through Jira product events (see Glossary: Jira product event). Workdown is Markdown with Frontmatter; supported fields and treatment of children are fixed conventions, not administrator configuration.
 
-The destination retains the latest document and ingests it as a TWG Document with unrestricted destination visibility. Once ingestion is acknowledged, a Publication becomes observable through Commands, a destination-local event, and an optional destination-owned Automation incoming webhook. Destination Automation Flows may act on this context; the app itself has no direct means to modify Jira work items and does not route incoming content to local projects or Epics.
+The destination retains the latest document and ingests it as a TWG Document with unrestricted destination visibility. Once ingestion is acknowledged, a Publication becomes observable through Commands, a destination-local Publication notification, and an optional destination-owned Automation incoming webhook. Destination Automation Flows may act on this context; the app itself has no direct means to modify Jira work items and does not route incoming content to local projects or Epics.
 
 Delivery is backend-first: business Commands specified with OpenRPC, implemented with help from `forge-ahead-rpc`, and tested before UI is layered on. Work is sliced vertically around Commands: the user defines each Command in the OpenRPC document before its ticket starts, after the OpenRPC path itself is bootstrapped with only the standard discovery method.
 
@@ -84,9 +84,9 @@ Delivery is backend-first: business Commands specified with OpenRPC, implemented
 
 ### Notifications and Automation Flows
 
-- Expose Publication receipt/status through Commands, a destination-local event, and an optional Automation incoming webhook. A Forge app event must not be presented as a native selectable Automation Flows trigger without verification.
+- Expose Publication receipt/status through Commands, a destination-local Publication notification, and an optional Automation incoming webhook. A Forge app event is not used, and must not be presented as a native selectable Automation Flows trigger without verification.
 - Destination Site Admins manage one optional webhook URL and authentication secret per incoming Peer Connection. Source sites cannot select the destination webhook.
-- Event metadata identifies the connection context, document, and sequence, and enables authenticated retrieval of the latest Workdown. Exact schemas and endpoint authentication remain contract work.
+- Publication notification metadata identifies the connection context, document, and sequence, and enables authenticated retrieval of the latest Workdown. Exact schemas and endpoint authentication remain contract work.
 - A Flow triggered by sequence 12 may retrieve sequence 13. This is valid; reads disclose the actual sequence and do not promise event-time content.
 - Flow authors own routing, deduplication, and Jira actions. Repeated webhook delivery may repeat a Flow; the app does not guarantee exactly-once execution or Jira side effects.
 - Native Flow-builder trigger support is a later platform investigation. Multiple subscribers and per-Exchange webhook routing are not initial features.
@@ -105,7 +105,7 @@ Delivery is backend-first: business Commands specified with OpenRPC, implemented
 - Specify business-level Commands with OpenRPC, using `forge-ahead-rpc` and the backbone example as architectural guidance, not inherited domain implementation.
 - Command includes read-only operations. Exact method names, parameter/result schemas, and error contracts are not approved by this scope document.
 - Responsibility groups include Connection invitation/acceptance/inspection/revocation, Exchange initiation/inspection, current-document retrieval, Publication/delivery status, and destination webhook configuration. Grouping is not a ticket inventory.
-- Keep business behavior independent of JSON-RPC transport, Forge runtime adapters, and eventual UI. Jira events reuse application behavior rather than implementing a second publication pipeline.
+- Keep business behavior independent of JSON-RPC transport, Forge runtime adapters, and eventual UI. Jira product events reuse application behavior rather than implementing a second publication pipeline.
 - Security outcomes: authenticate peer installations and direction, authorize callers, detect tampering, protect secrets, and reject traffic on revoked Connections. Protocol choice, replay defenses, invitation expiry, credential lifecycle, and audit ownership are decided in [ADR 0003](adr/0003-directional-peer-connection-security.md). Its implementation gates apply before the affected Commands ship.
 
 ### Delivery sequence
