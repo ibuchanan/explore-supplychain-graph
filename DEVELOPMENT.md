@@ -1,90 +1,357 @@
 # Development
 
-<!-- cspell:words openrpc webtrigger webtriggers supplychain WORKDOWN -->
-<!-- cspell:words Frontmatter mypermissions readback -->
+<!-- cspell:words Workdown workdown supplychain secretspec openrpc webtrigger -->
+<!-- cspell:words webtriggers Frontmatter readback mypermissions Rovo -->
 
-Install dependencies with `npm install`.
-Run the checks before sending a pull request:
+Use this guide to change, check, and troubleshoot the current Forge app.
+For admin UI activation, see
+[Create the Workdown connector connection](docs/how-to/how-to.md).
+For contribution requirements, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Prepare your workstation
+
+Use Node.js 24, as declared in `.nvmrc` and the Forge `nodejs24.x` runtime.
+Install dependencies from the repository root:
 
 ```sh
-npm run lint
-npm run lint:docs
-npm run format:check
-npm run typecheck
-npm run test
+npm install
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution process.
+The Forge workflows additionally need Bun, SecretSpec, and the Forge CLI on
+`PATH`. Follow the [Forge setup guide][forge-setup] to authenticate and
+[Fence Rider installation][installation] for its prerequisites. Dependency
+installation supplies Fence Rider, but does not install or authenticate every
+external tool.
 
-## First-time Forge setup with Fence Rider
+```sh
+bun run fence-rider doctor
+```
 
-The `forge:*` package scripts use [Fence Rider][fence-rider] to wrap the
-Forge CLI. It resolves configuration declared in `secretspec.toml` through
-[SecretSpec](https://secretspec.dev) and your chosen secret provider. Local
-controls select the site, product, and environment; manifest inputs are supplied
-to Forge locally; only variables listed in `[scopes.runtime]` are uploaded,
-always encrypted. Fence Rider is development tooling, not part of the deployed
-app.
+This checks tools, not app configuration or target selection.
 
-Complete these steps from the repository root before your first Forge workflow:
+## Configure local tooling without exposing secrets
 
-1. Install the tools described in Fence Rider's [installation guide][installation].
-   Dependency installation supplies Fence Rider, but you also need Bun,
-   SecretSpec, and the Forge CLI available on `PATH`. Follow the
-   [Forge getting-started guide][forge-setup] to authenticate; Fence Rider does
-   not install these tools or log you in. Check the installed tool versions:
+The `forge:deploy`, `forge:install`, `forge:upgrade`, `forge:uninstall`, and
+`forge:variables:set` scripts use [Fence Rider][fence-rider]. Registration uses
+the Forge CLI directly. Fence Rider is workstation tooling, not deployed app
+code. It resolves declarations in [secretspec.toml](secretspec.toml) through
+SecretSpec and your approved provider.
 
-   ```sh
-   bun run fence-rider doctor
-   ```
-
-   This checks tools only, not whether your app configuration resolves.
-
-2. Confirm access to the app and development site you intend to use. If you
-   cloned a sample and need your own app registration, follow the
-   [`forge register` reference][register] once. Registration changes the app ID
-   in `manifest.yml`; do not repeat it for an app you already own or are
-   authorized to develop.
-
-3. Follow [workstation provider setup][providers], then
-   [app requirements and secret storage][app-secrets]. Review this repository's
-   existing `secretspec.toml` rather than replacing it: retain its project name,
-   configure provider routes, and store values in your approved provider.
-   Commit declarations, never credentials or a secret value as a `default`.
-   Keep any local value files out of Git.
-
-4. Review the [local target settings][local] for `FORGE_SITE`, `FORGE_PRODUCT`,
-   and `FORGE_ENVIRONMENT` in the default profile. Choose your development site
-   and environment before continuing. These controls stay local; do not add
-   them to `[scopes.runtime]`. If the app uses manifest inputs, follow the
-   [manifest configuration guide][manifest]. Check resolution without printing
-   secret values:
+1. Confirm access to the intended Forge app and Jira development site. Register
+   a separately owned clone only when needed; do not re-register the existing
+   app. See the [registration reference][register].
+2. Configure [user providers][providers] and [app secret storage][app-secrets].
+   Preserve the repository's project name and declarations. Commit declarations,
+   never secret values or a credential as a `default`.
+3. Review `FORGE_SITE`, `FORGE_PRODUCT`, and `FORGE_ENVIRONMENT` in your selected
+   profile. This app's connector requires a Jira installation, and its current
+   loopback supports development only. **The deploy script explicitly selects
+   development**; keep installation and any variable upload targeted to the
+   same environment. Do not assume the profile changes that script's target.
+4. Check resolution without displaying values:
 
    ```sh
    SECRETSPEC_PROFILE=default bun run fence-rider doctor --resolve
    ```
 
-   This may access your provider and require authentication. It does not
-   display or confirm the target values; review those separately.
+   This may authenticate to your provider. It does not show or independently
+   verify the selected target values; review those separately.
 
-5. Once authorized to change the selected app, site, and environment, upload
-   runtime variables, deploy, and install:
+The current default profile also marks all three deployed-test inputs as
+`required = true`. Whole-profile resolution can therefore require these inputs
+for Forge workflows, even when you are not running cloud tests. This is the
+current configuration, not a recommendation to change its declarations.
+
+### Understand configuration boundaries
+
+- **Local controls:** `FORGE_SITE`, `FORGE_PRODUCT`, and `FORGE_ENVIRONMENT`
+  select tooling targets. They are not app secrets or runtime variables.
+- **Local test inputs:** the three `WORKDOWN_*` declarations below are consumed
+  by the test process. Do not upload them to Forge.
+- **Manifest inputs:** the current manifest declares no environment-variable
+  substitutions.
+- **Runtime inputs:** no `[scopes.runtime]` entries are currently declared in
+  `secretspec.toml`. Do not invent a runtime-secret upload step for this app.
+
+Fence Rider's [configuration explanation][variables] distinguishes these
+roles. If runtime variables are deliberately introduced later, changes need a
+subsequent deployment to take effect; follow its [runtime workflow][runtime]
+and the [Forge variables reference][forge-variables].
+
+## Edit and check locally
+
+Run the required repository gate before submitting changes:
+
+```sh
+npm run check
+```
+
+It runs linting, tests, and build/size validation through the configured task
+runner. Ordinary local tests exclude `*.deployed.test.ts`; this gate does not
+prove cloud authorization, ingestion, or Search visibility.
+
+Use focused checks during development:
+
+| Command                                | Purpose                                                             |
+| -------------------------------------- | ------------------------------------------------------------------- |
+| `npm test -- test/publication.test.ts` | Run a focused local test file                                       |
+| `npm run typecheck`                    | TypeScript validation without emitting files                        |
+| `npm run lint`                         | Code, contract drift, formatting, Forge manifest, and static checks |
+| `npm run format:check`                 | Report formatting differences                                       |
+| `npm run format`                       | Apply repository formatting; review the resulting diff              |
+| `npm run lint:docs`                    | Markdown and spelling checks, separate from the main gate           |
+| `npm run size:check`                   | Build and check the configured 32 kB compressed size limit          |
+
+`npm run lint` already includes formatting and typechecking; repeating every
+individual check is not necessary. Forge lint requires the CLI and may consult
+platform state. No deployed test should be run merely to satisfy a local gate.
+
+### Maintain the contract and generated code
+
+Edit [src/openrpc.json](src/openrpc.json) for approved Command contracts and
+its `x-notifications` extension for JSON-RPC Publication notifications. Then run:
+
+```sh
+npm run contract:generate
+npm run lint:check:contract
+```
+
+The app-local generator in `scripts/` produces `src/generated/` types, policy,
+and standalone validators, including Frontmatter validation from
+`src/workdown-frontmatter.schema.json`. Do not hand-edit generated artifacts.
+The drift check is included in linting. Runtime validators are distinct from
+the OpenRPC meta-schema checks used by local contract tests.
+
+## Deploy an authorized development change
+
+Deployment and installation are remote writes. Confirm the target app, site,
+Jira product, environment, scopes, and egress before running them.
+
+```sh
+npm run forge:deploy
+```
+
+For a first installation, use `npm run forge:install` after deployment. For an
+existing installation with permission changes, use `npm run forge:upgrade`.
+Code-only changes do not inherently require an installation upgrade. These
+scripts include non-interactive approval flags; they do not replace human
+review of major-version, scope, or egress changes.
+
+App installation and connector activation are separate operations. Follow the
+[admin connection guide](docs/how-to/how-to.md) after installation. Creating a
+connection saves a binding; it does not start ingestion. There is no task
+runner or scheduled refresh in the current manifest.
+
+For the platform lifecycle, see [Forge environments][environments] and
+[Fence Rider installation management][forge-tooling]. Local file edits do not
+update deployed code; use an approved development deployment when cloud
+verification needs those edits.
+
+## Understand authenticated JSON-RPC
+
+Both manifest webtriggers dispatch the same current handler. The async module
+is an alias, not a queued implementation or an artificial delay. Forge routes
+the URL to an installation; the app authenticates callers itself.
+
+Every request needs `Authorization: Basic BASE64`, encoding `email:api-token`.
+The caller supplies a scoped Jira API token. Requests use the verified
+credential against `https://api.atlassian.com/ex/jira/<trusted-cloud-id>/`;
+this is credential forwarding, not Forge `asUser(accountId)`. Never put a
+credential or tenant selector into JSON-RPC parameters.
+
+| Operation                            | Current admission and execution boundary                                                                                |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| `rpc.discover`, `workdown.export`    | Active Atlassian identity plus Jira global `ADMINISTER`; export reads with the caller's credential                      |
+| `exchange.start`                     | Active authenticated identity plus `ADMINISTER_PROJECTS` for the source issue; source reads use the caller's credential |
+| `document.get`, `publication.status` | Active authenticated destination reader; reads tenant-local retained state without rechecking source Jira visibility    |
+
+`src/index.ts` selects admission, `src/jira.ts` verifies identity/permissions
+and the trusted Jira site `installContext`, and `src/rpc.ts` composes the
+Commands. Missing or invalid installation binding fails closed. Headers and
+request parameters do not select an installation. Denied caller reads never
+fall back to app access.
+
+The HTTP RPC adapter accepts a single request with named parameters and a
+string or number ID; it does not accept HTTP batch requests, notifications,
+or positional parameters. `publication.published` is an internal,
+destination-local JSON-RPC notification, not a Forge App Event or public HTTP
+receiver. Protocol errors use JSON-RPC envelopes over HTTP 200; non-POST
+requests receive HTTP 405. An HTTP 200 alone does not establish Command success.
+
+The current loopback stores source/destination document state and may publish
+a workspace-visible graph document. Review the
+[disclosure boundary](specs/adr/0002-workdown-disclosure-boundary.md) before
+using private Jira content. Source Jira access controls are not replicated.
+
+## Configure deployed-test inputs
+
+Run cloud tests only against an approved development installation and approved
+content. Configure these existing declarations through your SecretSpec provider:
+
+| Name                      | Purpose                                                       | Provider role     |
+| ------------------------- | ------------------------------------------------------------- | ----------------- |
+| `WORKDOWN_RPC_URL`        | Approved installation's HTTPS webtrigger URL; treat as secret | `project_secrets` |
+| `WORKDOWN_TEST_EMAIL`     | Atlassian account email for the Jira-admin test user          | `project_config`  |
+| `WORKDOWN_TEST_API_TOKEN` | Scoped Jira API token for that user                           | `project_secrets` |
+
+All are currently required in the default profile. Issue keys and expected
+content belong in the ignored scenario file, not in additional environment
+variables. Do not add these inputs to manifest or runtime scopes.
+
+After deployment, inspect existing URLs with this read-only command:
+
+```sh
+forge webtrigger list --site <approved-site> --product jira --environment development
+```
+
+If a URL must be created, `forge webtrigger create` is a separate authorized
+remote action. Select the correct installation and sync module
+`explore-supplychain-graph-webtrigger-sync`.
+
+Enter secrets yourself in a trusted terminal with shell tracing and recording
+off. Store values through the same provider roles the declarations read:
+
+```sh
+secretspec set --provider project_secrets --profile default WORKDOWN_RPC_URL
+secretspec set --provider project_config --profile default WORKDOWN_TEST_EMAIL
+secretspec set --provider project_secrets --profile default WORKDOWN_TEST_API_TOKEN
+```
+
+Check resolution without printing values with `secretspec check --scope ''
+--explain` (one command). Never run `secretspec get`, print the environment, or
+log Authorization headers to investigate these inputs. Agents must not inspect
+secret values. Explicitly authorize any agent-run cloud test through SecretSpec.
+
+The test user needs Jira global `ADMINISTER` for the suite's discovery/export
+checks, plus access to its source issues and project-admin permission for
+Exchange starts. A project admin alone cannot run the complete suite. Token
+scopes and Jira permissions are separate; successful reads do not establish
+Jira write permission. Rotate an expired token through the same provider;
+never put tokens in chat, fixtures, or commits.
+
+### Configure issue scenarios
+
+Copy [test/deployed.example.json](test/deployed.example.json) to the Git-ignored
+`test/deployed.local.json`. Use independently known, approved test data. Keep
+aliases generic: aliases and declared project types appear in test names.
+Do not commit private issue identities or content.
+
+Each entry under `issues` needs a `key`, `projectType` (`company-managed` or
+`team-managed`), and exactly one of these expectation shapes:
+
+- **Successful export:** `expected.start_date` (an exact calendar date or null
+  for omission), ordered `expected.children` (issue keys, empty array allowed),
+  and nonempty `expected.description` with LF line endings and no CR characters.
+- **Expected denial:** only `expected.errorCode`, one of -32001 (forbidden),
+  -32005 (ineligible), or -32006 (indeterminate eligibility).
+
+Do not generate expectations from the export under test. Project types are
+operator-supplied coverage labels, not independently verified by the harness.
+Configure readable secured/unreadable negative fixtures only when independently
+known; deferred fixture checks are not passes. The parser in
+`test/deployed-harness.ts` rejects invalid configuration before network access.
+
+## Run approved cloud checks
+
+These scripts inject the whole SecretSpec profile locally. Fence Rider wraps
+supported Forge commands, not arbitrary test commands.
+
+| Command                             | Side effects and evidence                                                                                                                                                          |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run test:deployed`             | Checks authenticated discovery/export and loopback Exchange behavior; retains documents and may ingest into TWG, but does not edit Jira issues. Publication may remain null.       |
+| `npm run test:deployed:publication` | Starts/repeats the successful `epicWithStartDate` scenario and may retry ingestion. Requires current retained/published sequences to match; null fails. Does not edit Jira issues. |
+
+A strict Publication pass proves app-recorded acknowledgment, not independent
+graph readback or Rovo Search visibility. Verify Search separately after
+ingestion acceptance; indexing delay does not explain a null published sequence.
+
+### Run the disposable Epic sequence test separately
+
+`test/exchange-sequence.deployed.test.ts` is an explicitly opt-in Jira-write
+scenario. It creates an Epic, edits its description, and restores the original
+description while checking concurrent sequence allocation. Restoration does not
+undo issue history, automation effects, or Exchange/graph state. The Epic is
+left for inspection; each run creates another. Its recovery record is ignored
+at `test/exchange-sequence.local.json`.
+
+The credential needs project **Browse projects**, **Create issues**, and
+**Edit issues**, applicable issue-security access, project-admin permission for
+Exchange, and the suite's development Jira-admin admission. Keep the existing
+read token scopes and add the documented write scopes supported by the token
+picker:
+
+| Operation    | Classic scope     | Published granular alternative                                                                                      |
+| ------------ | ----------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Create Epic  | `write:jira-work` | `write:issue:jira`, `write:comment:jira`, `write:comment.property:jira`, `write:attachment:jira`, `read:issue:jira` |
+| Edit/restore | `write:jira-work` | `write:issue:jira`                                                                                                  |
+
+These alternatives were checked against Jira REST contracts on 2026-11-19;
+see [Create issue][create-issue-api] and [Edit issue][edit-issue-api]. Do not
+assume the granular edit scope alone satisfies the create contract. No delete
+permission is needed. These are test-credential permissions, not additional
+Forge app scopes.
+
+After approval for the target, credential, and write activity, run:
+
+```sh
+secretspec run --scope '' -- env WORKDOWN_DEPLOYED_TEST=1 WORKDOWN_SEQUENCE_TEST=1 ./node_modules/.bin/vitest run test/exchange-sequence.deployed.test.ts
+```
+
+## Troubleshoot retained but unpublished documents
+
+As of development 5.3.0 on 2026-11-19, the strict Publication test fails:
+retained sequence 1, published sequence null. The connector binding is found,
+but the graph SDK returns HTTP 401. The cause is unresolved. See
+[Publication verification evidence](specs/workdown-publication-verification.md)
+for deployment history, trace IDs, and remaining platform gates.
+
+1. Distinguish RPC completion from Publication. `workdown.rpc.completed` can
+   report a successful Exchange even when graph ingestion is unacknowledged.
+2. Read bounded development logs:
 
    ```sh
-   npm run forge:variables:set && npm run forge:deploy && npm run forge:install
+   forge logs -e development --limit 20
    ```
 
-   **These commands change remote state.** Keep the same configured environment
-   for upload and deployment; do not override only the deployment target.
-   Stored runtime variables become active on the subsequent deployment.
-   For code-only changes with unchanged runtime values, run `npm run forge:deploy`.
-   After permission scope changes, run `npm run forge:upgrade` for existing
-   installations. See [runtime workflows][runtime] and
-   [installation management][forge-tooling] for details.
+3. Inspect `workdown.graph.binding`, `workdown.graph.ingestion`, and
+   `workdown.publication`. Fixed stage/outcome labels distinguish binding
+   admission, SDK acknowledgment, conditional storage, and notification failure.
+   Selected response metadata includes HTTP status, counts, an acceptance-match
+   flag, and a validated service trace ID when supplied by the SDK.
+4. Preserve timestamp, deployment/environment, trace ID, and Forge invocation
+   ID for platform investigation. Do not log raw SDK errors, response bodies,
+   Workdown content, credentials, endpoint URLs, or runtime context.
+5. Confirm the intended connection in the admin UI using the
+   [admin setup guide](docs/how-to/how-to.md). A saved binding alone does not
+   prove current platform authorization. Do not disconnect/reconnect blindly:
+   disconnect deletes ingested connector data.
 
-For a guided exercise with disposable values, follow the
-[Fence Rider tutorial][tutorial]. Its example script names differ from this
-repository's `forge:*` names; use the scripts in this repository's `package.json`.
+Another code deployment, broader scopes, changed content ACLs, or weakened
+acceptance checks is not an established 401 fix. A service-trace investigation
+or a separately approved controlled invocation-context comparison is the next
+step. No diagnostic hook currently runs ingestion from a connector callback.
+
+## Find implementation and historical evidence
+
+- `src/workdown*.ts`, `src/jira.ts`: Jira export, eligibility, description,
+  children, and caller-bound source access.
+- `src/exchange.ts`, `src/exchange-storage.ts`: loopback retention, version
+  allocation, conditional publication acknowledgment, and destination reads.
+- `src/publication.ts`, `src/graph.ts`: graph projection, connector lifecycle,
+  and internal notification dispatch.
+- `src/openrpc.json`, `scripts/`, `src/generated/`: contract source, generation,
+  and generated runtime artifacts.
+- `test/`: local tests, opt-in deployed checks, and public example scenarios.
+- `docs/`: admin and learning guides. `specs/`: design decisions and evidence.
+- [Jira export specification](specs/workdown-jira.md): historical export gates,
+  including Start date compatibility and cloud evidence.
+- [Exchange contract review](specs/workdown-exchange-contract-review.md) and
+  [Publication evidence](specs/workdown-publication-verification.md): current
+  boundaries, limitations, and platform verification still outstanding.
+
+Ticket-era anonymous discovery examples and obsolete setup instructions are
+not the supported workflow. Consult Git history for those earlier guide
+versions; do not reuse their unauthenticated invocation or no-storage claims.
 
 [fence-rider]: https://github.com/ibuchanan/ranch-rig-fence-rider
 [installation]: https://github.com/ibuchanan/ranch-rig-fence-rider/blob/main/docs/how-to/installation.md
@@ -92,441 +359,10 @@ repository's `forge:*` names; use the scripts in this repository's `package.json
 [register]: https://developer.atlassian.com/platform/forge/cli-reference/register/
 [providers]: https://github.com/ibuchanan/ranch-rig-fence-rider/blob/main/docs/how-to/configure-user-providers.md
 [app-secrets]: https://github.com/ibuchanan/ranch-rig-fence-rider/blob/main/docs/how-to/configure-app-secrets.md
-[local]: https://github.com/ibuchanan/ranch-rig-fence-rider/blob/main/docs/how-to/local.md
-[manifest]: https://github.com/ibuchanan/ranch-rig-fence-rider/blob/main/docs/how-to/manifest.md
+[variables]: https://github.com/ibuchanan/ranch-rig-fence-rider/blob/main/docs/explanation/three-kinds-of-env-vars.md
 [runtime]: https://github.com/ibuchanan/ranch-rig-fence-rider/blob/main/docs/how-to/runtime.md
+[forge-variables]: https://developer.atlassian.com/platform/forge/cli-reference/variables-set/
+[environments]: https://developer.atlassian.com/platform/forge/environments-and-versions/
 [forge-tooling]: https://github.com/ibuchanan/ranch-rig-fence-rider/blob/main/docs/how-to/use-forge-tooling.md
-[tutorial]: https://github.com/ibuchanan/ranch-rig-fence-rider/blob/main/docs/tutorials/tutorial.md
-
-## Exercise authenticated JSON-RPC
-
-Ticket 03 supersedes the historical bootstrap details below. Both manifest
-entry points now use the backbone's authenticated webtrigger adapter; discovery
-is no longer anonymous. The application contract is unchanged.
-
-### Ticket 03 implementation and release gate
-
-- `npm run contract:generate` generates types, standalone validators, and web
-  policy in `src/generated/`; `npm run lint:check:contract` rejects drift.
-- `workdown.export` reads the issue and canonical site URL with the caller's
-  credential, emits the two core golden documents, and validates Frontmatter
-  against `src/workdown-frontmatter.schema.json` plus safe YAML and identity
-  invariants. Ticket 04 adds the scalar disclosure allowlist and semantic Start
-  date resolution; its revised single-site cloud gate passed on development
-  3.3.0 (2026-11-17): discovery and both structured export scenarios passed,
-  including an exact populated Start date and explicit omission.
-  Rich ADF fails closed until ticket 07; eligibility and children remain tickets
-  05–06. No data is stored or published.
-- Start date discovery paginates `field/search?expand=stableId`, checks the
-  complete project-filtered catalog, and reads only the resolved local field ID.
-  All reads use the caller's token. A complete authoritative zero-match catalog
-  or readable empty value omits `start_date`. Incomplete/unreadable metadata or
-  requested values fail with `field-unreadable` (-32004); ambiguous/incompatible
-  mappings fail with `field-unresolved` (-32003), without returning field names.
-  No extra OAuth scopes or egress destinations are declared. Catalog work is
-  bounded to 1000 pages per enumeration and fails rather than returning partial
-  results. The passing scenarios declare company-managed and team-managed
-  project types; these are operator-supplied labels, not harness-verified types.
-  The team-managed omission case does not establish universal populated-date
-  support; see the ticket 04 evidence in `specs/workdown-jira.md`.
-- For ticket 04 acceptance, configure a named issue in `test/deployed.local.json`
-  with a known populated `expected.start_date` and run the deployed tests on
-  one approved site. Every issue requires an explicit expectation; `null`
-  requires omission and does not prove populated-date export. Existing local
-  fixtures exercise different field IDs; no second site is required. Record
-  the project type exercised, cover both types on the same site where practical,
-  and explicitly record any unverified type as a compatibility limitation.
-- Every request, including discovery, needs `Authorization: Basic BASE64`, where
-  BASE64 encodes `email:api-token`. Use a scoped Jira API token with access to
-  the identity, permissions, issue, and server-info reads below. The exact
-  sufficient token scopes remain a deployed verification gate; a denied read
-  never falls back to app access. Never put credentials in JSON-RPC parameters.
-- Installation binding uses only the Forge function's second argument,
-  `installContext`, requiring a Jira site ARI. Missing or invalid binding denies
-  access. Neither the request body nor HTTP headers select a tenant.
-- The authenticator calls `/rest/api/3/myself`, requires an active Atlassian
-  account, then checks `/rest/api/3/mypermissions?permissions=ADMINISTER`.
-  Ian Buchanan approved **Jira administrator**, rather than site administrator,
-  as sufficient for the development gate on 2026-11-16.
-- Reads use `https://api.atlassian.com/ex/jira/<trusted-cloud-id>/rest/api/3/`
-  and the same verified credential, with redirects disabled and bounded waits.
-  `canActAsUser` requires that verified principal and credential in trusted
-  context. This is credential forwarding, not Forge `asUser(accountId)`;
-  knowing an account ID alone never grants caller execution.
-- Public discovery is generated by the backbone and omits private policy
-  metadata. Only implemented, selected Commands appear. Missing or unreadable
-  issues return `forbidden` (-32001); readable non-Epics return
-  `profile-mismatch` (-32002); invalid inputs return `invalid-params` (-32602).
-  Unexpected reads, invalid output, and unsupported descriptions fail without
-  returning content. Both entry points use `@forge-ahead/logging` with logger
-  name `workdown`, invocation lifecycle logging, and ambient context. Each
-  completed response emits `workdown.rpc.completed` with a generated random
-  `requestId`, operation, duration, HTTP status, and success/failure outcome;
-  JSON-RPC errors over HTTP 200 are failures and include only their numeric
-  `rpcErrorCode`. Unexpected thrown failures emit `workdown.rpc.failed` using
-  an empty allow-list error policy (no raw messages or stack traces), then are
-  rethrown unchanged. Request bodies, headers, query parameters, response
-  documents, tenant/account/issue identifiers, and endpoint URLs are never
-  passed to the logger. The correlation ID is generated locally, not copied
-  from untrusted JSON-RPC or HTTP inputs. Default redaction remains a backstop.
-  `LOG_LEVEL` uses the package's environment-aware defaults; a named override
-  such as `workdown=debug` is supported. No additional runtime variable is
-  required. These are operational logs, not durable audit events; use the
-  outcome field rather than the completion message alone to identify success.
-- **Deployment review:** manifest adds backend egress to
-  `https://api.atlassian.com`; no OAuth scopes, runtime secrets, storage, modules,
-  or app identity changes. Forge lint reports a major-version approval gate for
-  this egress change. Do not suppress that gate or deploy/upgrade without
-  explicit target and permission approval.
-- **Evidence boundary:** local fakes verify app decisions, not platform
-  authorization. The updated deployed test and log readback have not run for
-  ticket 03. Ticket 02's earlier anonymous discovery evidence does not verify
-  this implementation. The Jira-admin gate cannot demonstrate a non-admin
-  caller's denied issue read in cloud; that negative case is local only.
-- Added direct dependency `yaml` (already present transitively). Run
-  `npm install` outside the sandbox to update the lockfile before release.
-  No dependency installation or lockfile editing was performed by the agent.
-
-Supply the local connection inputs declared in `secretspec.toml`:
-`WORKDOWN_RPC_URL`, `WORKDOWN_TEST_EMAIL`, and `WORKDOWN_TEST_API_TOKEN`.
-Configure readable Epics with empty or plain-text descriptions and their
-independent expectations in `test/deployed.local.json` as described below.
-The old `WORKDOWN_TEST_ISSUE` and expected-date environment inputs are no longer
-read; any previously stored issue value can be retired separately.
-Run `secretspec run --scope '' -- npm run test:deployed` in a trusted terminal
-only after approved deployment and installation upgrade. The test requires
-unauthenticated discovery to fail, validates authenticated discovery, and
-exports the real Epic without printing its document. Read back the fixed log
-marker using `forge logs` after approval of that verification step.
-
-### Historical ticket 02 bootstrap (superseded)
-
-The following describes only the previously deployed discovery-only version,
-not the ticket 03 source or the current invocation procedure.
-
-## Exercise JSON-RPC discovery (historical)
-
-`src/openrpc.json` is the contract source. It declares application Commands
-only, currently `workdown.export`, which is not implemented yet. It never lists
-`rpc.discover`: the library's contract generator rejects that reserved name.
-`src/rpc.ts` registers discovery by hand with the installed `@forge-ahead/rpc`
-dispatcher and returns this document, so discovery already advertises
-`workdown.export` although nothing handles it. Ticket 03 generates handlers and
-validators from the contract and moves discovery onto the library's web
-dispatcher, which serves only Commands that have handlers. Application errors
-are in `src/command-errors.ts`. Future Command contracts must be approved before
-implementing them.
-
-Run the local dispatcher and webtrigger tests with `npm test`, or all repository
-checks with `npm run check`. The OpenRPC document is checked against the standard
-meta-schema and its JSON Schema dialect. These validators are test-only and are
-not imported into the Forge runtime. Format assertions are disabled; structural
-schema validation remains enabled.
-
-### Invoke an approved development installation
-
-Deployment and installation require separate approval of the target app,
-site, product, and environment. This slice changes no manifest modules, scopes,
-or external permissions: both existing dynamic webtriggers now dispatch the same
-JSON-RPC discovery request instead of the scaffold response.
-
-After an approved deployment, list the existing installation URLs:
-
-```sh
-forge webtrigger list --site <approved-site> --product jira --environment <approved-environment>
-```
-
-If none exists, an authorized site administrator can generate one with
-`forge webtrigger create`, selecting the approved installation and the
-`explore-supplychain-graph-webtrigger-sync` module. URL creation is a separate
-remote write; do not run it without approval. The async module is an alias for
-the same handler, with no artificial delay.
-
-Set `WORKDOWN_RPC_URL` locally to that HTTPS URL, then run:
-
-```sh
-npm run test:deployed
-```
-
-This test makes a real HTTP POST to Forge and compares the complete JSON-RPC
-response with the local contract, then validates the returned OpenRPC document.
-It is excluded from ordinary local checks. An explicit deployed test fails when
-the URL is missing, rather than silently skipping. A missing URL failure is not
-cloud execution evidence. Do not commit installation URLs or raw runtime context.
-
-For a manual invocation using the same local variable:
-
-```sh
-curl --request POST "$WORKDOWN_RPC_URL" \
-  --header 'Content-Type: application/json' \
-  --data '{"jsonrpc":"2.0","id":"manual","method":"rpc.discover","params":{}}'
-```
-
-The backbone accepts a single request with named `params` and a string or number
-`id`; batch requests, notifications, and positional parameters are unsupported.
-Protocol errors use JSON-RPC error envelopes over HTTP 200; non-POST requests
-receive HTTP 405. Invalid JSON produces parse-error `-32700`, malformed envelopes
-invalid-request `-32600`, and unknown methods method-not-found `-32601`.
-
-### Caller and installation boundary
-
-Forge routes the webtrigger URL to a particular installation and passes the HTTP
-payload as the first handler argument and runtime context separately as the
-second. It does **not** authenticate webtrigger callers. The bootstrap deliberately
-ignores runtime context and supplies no caller or installation authority to the
-static discovery handler. Headers, query parameters, and JSON-RPC parameters do
-not establish an Atlassian user or a trusted installation.
-
-Only the static app contract is exposed; there are no Jira reads, secrets,
-storage operations, or app-level actions. Before adding any application Command
-to this public transport, establish verified caller authentication and trusted
-installation binding (or select an authenticated Forge entry point). Do not infer
-`asUser` authority from a request-supplied account ID. The library's authenticated
-webtrigger adapter requires app-owned authentication; it is not used to invent
-an anonymous principal here.
-
-**Evidence, 2026-11-16:** local red–green tests, schema validation, typecheck,
-build, and `npm run check` passed. The developer deployed version 2.0.0 to
-development and installed it in Jira on the development test site. After explicit
-approval, the sync webtrigger URL was created and `npm run test:deployed` passed
-at 09:28 (one real cloud test, about 2.1 seconds). It verified HTTP 200, the exact
-JSON-RPC envelope and contract, and standard OpenRPC structural validity.
-Ticket 02's deployed-test gate is satisfied; ticket 03 still requires its own
-approved Command definition.
-
-A bounded `forge logs` read for the sync function returned no entries. The
-handler emits no application logs, and no raw runtime context was captured or
-exposed. Caller identity and installation-context contents were not dynamically
-verified; the static discovery handler ignores both. Authenticated caller and
-trusted installation binding remain prerequisites for data-bearing Commands,
-not properties established by this discovery test. Installation URLs are omitted
-from committed evidence.
-
-Platform references checked for this slice:
-[webtrigger runtime](https://developer.atlassian.com/platform/forge/runtime-reference/web-trigger/),
-[request/response events](https://developer.atlassian.com/platform/forge/events-reference/web-trigger/),
-and [webtrigger CLI](https://developer.atlassian.com/platform/forge/cli-reference/webtrigger/).
-
-## Credentials for deployed integration tests
-
-From ticket 03 onward, deployed tests call authenticated Commands. The RPC
-backbone's webtrigger adapter checks an `Authorization` credential on every
-request. The development loop uses a Jira API token and accepts a caller who
-is an active Atlassian user with Jira's `ADMINISTER` global permission. This
-is the development-loop model, not end-user authentication. The exact header
-format is documented above. SecretSpec holds only the three connection inputs;
-issue identities and expected values belong in the local scenario file.
-
-| Name                      | What it is                                              | Storage role                                          |
-| ------------------------- | ------------------------------------------------------- | ----------------------------------------------------- |
-| `WORKDOWN_RPC_URL`        | Webtrigger URL of the approved development installation | `project_secrets` (a capability URL; treat as secret) |
-| `WORKDOWN_TEST_EMAIL`     | Atlassian account email of the test user (a Jira admin) | `project_config`                                      |
-| `WORKDOWN_TEST_API_TOKEN` | That user's Atlassian API token                         | `project_secrets`                                     |
-
-### Where these values go
-
-These are **local** variables: only the test process on your workstation or CI
-runner reads them. Do not list them in `[scopes.runtime]`, which uploads values
-to Forge where the deployed function can read them, and do not list them in
-`[scopes.manifest]`. Only values the deployed app itself needs belong in the
-runtime scope. See Fence Rider's explanation of
-[the three kinds of variables](node_modules/fence-rider/docs/explanation/three-kinds-of-env-vars.md).
-
-Fence Rider wraps `variables`, `deploy`, `install`, `lint`, and `tunnel`; it does
-not run tests. Run tests through SecretSpec directly.
-
-### Declare them
-
-Ticket 03 adds declarations like these to `secretspec.toml`, with no values:
-
-```toml
-[profiles.default.WORKDOWN_RPC_URL]
-description = "Webtrigger URL of the approved development installation"
-required = false
-providers = ["project_secrets"]
-
-[profiles.default.WORKDOWN_TEST_EMAIL]
-description = "Email of the Jira-admin test user"
-required = false
-providers = ["project_config"]
-
-[profiles.default.WORKDOWN_TEST_API_TOKEN]
-description = "Scoped Jira API token of the Jira-admin test user"
-required = false
-providers = ["project_secrets"]
-```
-
-Keep `required = false`. Fence Rider resolves the whole profile before deploys,
-so a required test credential would block every deploy for anyone who has not
-stored it. The deployed test fails explicitly when a value is missing, as the
-discovery test does for `WORKDOWN_RPC_URL`.
-
-### Obtain and store them
-
-Run these yourself in a trusted terminal, with shell tracing off and no terminal
-recording or agent capture while you enter secrets.
-
-1. **Webtrigger URL.** After an approved deploy and install, use
-   `forge webtrigger list` as in the section above. Creating a URL is a remote
-   write and needs approval.
-2. **API token.** Sign in as the test user (an administrator of the development
-   site) and create a token under your Atlassian account's Security settings
-   (`https://id.atlassian.com/manage-profile/security/api-tokens`). Label it for
-   this project and set an expiry. Confirm with ticket 03 which token type the
-   authenticator expects.
-3. **Store them** (enter the value at the prompt; write to the same role the
-   declaration reads from):
-
-   ```sh
-   secretspec set --provider project_secrets --profile default WORKDOWN_RPC_URL
-   secretspec set --provider project_config --profile default WORKDOWN_TEST_EMAIL
-   secretspec set --provider project_secrets --profile default WORKDOWN_TEST_API_TOKEN
-   ```
-
-   Provider setup is in Fence Rider's
-   [user-provider guide](node_modules/fence-rider/docs/how-to/configure-user-providers.md)
-   and [app secrets guide](node_modules/fence-rider/docs/how-to/configure-app-secrets.md).
-
-### Configure issue scenarios
-
-Copy `test/deployed.example.json` to `test/deployed.local.json` and use the
-checked-in public dataset values or replace them with independently known test
-data. The example's real issue keys are from a public, well-known dataset and
-are intentionally retained. The local file is Git-ignored; never commit private
-issue identities, content, or credentials. No local scenario file is created
-automatically. Keep aliases generic because aliases and declared project types
-appear in test names.
-
-Each named entry under `issues` contains `key`, `projectType` (company-managed
-or team-managed), and exactly one of `expected.start_date` or
-`expected.errorCode`. A date asserts the exact exported value; `null` asserts
-that the field is omitted. Error codes -32001, -32005 and -32006 assert forbidden,
-ineligible and indeterminate eligibility respectively, with no document. The
-current team-managed example expects -32006 because secured-item detection is
-unverified for that project type. Do not invent negative issue identities:
-configure a known readable secured Epic and a known unreadable Epic when available.
-Missing expectations, invalid calendar dates, unknown properties, and empty issue
-sets fail configuration
-validation before any network request. Remove illustrative scenarios that do
-not apply; two project types are not mandatory. Declared project types are
-operator-supplied coverage labels, not independently verified by the harness.
-
-Maintain expectations independently of the export under test; do not generate
-them from its output. Add fields to the typed configuration and its validator
-when a subsequent ticket needs them, rather than adding environment variables.
-`test/deployed-harness.ts` provides the validated loader and shared authenticated
-RPC helper. Local harness tests use synthetic inputs and make no cloud calls.
-
-The deployed suite checks discovery once and exports each scenario separately,
-including document validity, allowlist, issue key, and Start date expectation.
-Failures suppress credentials, response bodies, and documents; scenario aliases
-and assertion labels identify the failing check. These read-only tests neither
-provision nor modify issues. The earlier `field-unreadable` failure was resolved
-by the catalog-validation correction, not by the harness; the subsequent 3.3.0
-structured deployed run passed all three tests.
-
-### Authorize the disposable Epic sequence test
-
-The ordinary deployed export tests require Jira reads, not Jira issue writes.
-The previously recorded classic read scheme is `read:jira-user` plus
-`read:jira-work` (or sufficient granular equivalents); the actual token scope
-configuration has not been inspected. Read success does not establish write
-access.
-
-`test/exchange-sequence.deployed.test.ts` is a separate, explicitly opt-in test.
-It creates a disposable Epic, changes its description, and restores it while
-checking concurrent Exchange sequence allocation. Keep existing read scopes and
-add the write scopes supported by your API-token scope picker:
-
-| Operation                                            | Classic scope     | Granular alternative listed by Jira                                                                                 |
-| ---------------------------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Create Epic: `POST /rest/api/3/issue`                | `write:jira-work` | `write:issue:jira`, `write:comment:jira`, `write:comment.property:jira`, `write:attachment:jira`, `read:issue:jira` |
-| Edit/restore: `PUT /rest/api/3/issue/{issueIdOrKey}` | `write:jira-work` | `write:issue:jira`                                                                                                  |
-
-Checked against Jira's REST v3 OpenAPI contracts on 2026-11-19. The contracts
-recommend classic scopes; their granular alternatives are marked Beta. If the
-scoped API-token picker offers only granular scopes, use the documented granular
-set plus the read scopes needed by the existing tests. Do not assume
-`write:issue:jira` alone satisfies the create endpoint's published scope set.
-The classic route needs only one additional scope, `write:jira-work`; this is
-not a claim that the individual fields used by the test require every granular
-capability listed by the endpoint. See [Create issue][create-issue-api] and
-[Edit issue][edit-issue-api].
-
-The credential owner also needs these Jira permissions in the test project:
-
-- **Browse projects** and **Create issues** for creation.
-- **Browse projects** and **Edit issues** for editing/restoring; permission to
-  view the issue if issue-level security applies.
-- The existing development RPC authentication additionally requires an active
-  user with the Jira **ADMINISTER** global permission. Being a Jira admin does
-  not replace project permissions. The Epic must satisfy the export eligibility
-  rules and its description must be editable.
-
-No delete permission or admin-write token scope is needed by this scenario. It
-leaves the Epic for inspection; restoration preserves Jira history, automation
-side effects and the advanced Exchange sequence. Its identity/recovery record
-is stored in Git-ignored `test/exchange-sequence.local.json`. Each run creates
-another Epic; obtain approval for the target and write activity before running.
-
-Store a suitably scoped credential as `WORKDOWN_TEST_API_TOKEN` through the
-existing SecretSpec workflow; never put its value in chat, a scenario file, or
-a commit. This grants writes to the **test credential**, not to the Forge app:
-no manifest scope, app-access fallback, deployment or installation change is
-required. The existing read-only token can still run ordinary read scenarios.
-A create request returned HTTP 401 with the previous credential; missing write
-scope is consistent with the recorded read scheme but was not independently
-confirmed as the cause.
-
-With the approved credential, site and scenario configured:
-
-```sh
-secretspec run --scope '' -- env WORKDOWN_DEPLOYED_TEST=1 WORKDOWN_SEQUENCE_TEST=1 \
-  ./node_modules/.bin/vitest run test/exchange-sequence.deployed.test.ts
-```
-
 [create-issue-api]: https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/#api-rest-api-3-issue-post
 [edit-issue-api]: https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/#api-rest-api-3-issue-issueidorkey-put
-
-### Use them
-
-Check that the names resolve without printing values:
-
-```sh
-secretspec check --scope '' --explain
-```
-
-Run the deployed tests with the whole profile injected into the test process:
-
-```sh
-secretspec run --scope '' -- npm run test:deployed
-```
-
-Never use `secretspec get`, `printenv`, or log output to inspect real values, and
-never echo the `Authorization` header from a test. A coding agent must not read
-these values. Run the deployed test yourself, or explicitly authorize an agent
-to run it through `secretspec run` and keep the output free of credentials.
-
-### Rotation and further sites
-
-API tokens expire: create a new one and `secretspec set` it again. A webtrigger
-URL changes only if it is recreated or the module key or `urlFormat` changes. A
-second development site, if separately approved for a named residual integration
-risk, needs its own URL and credentials; choose separate names or a separate
-SecretSpec profile when it exists. It is not a blanket ticket prerequisite.
-Default to local isolated-peer tests plus targeted checks on the existing
-installation; distinguish those from actual inter-installation evidence. Never
-bypass authentication or installation binding for a test. If the approved boundary
-cannot safely exercise a remote case on one installation, record that case as
-unverified rather than add a test-only production Command. See the testing
-decisions in `specs/supplychain-graph.md`.
-
-## Repository layout
-
-- `.atlassian/`: Repository ownership metadata.
-- `src/`: TypeScript source code.
-- `docs/`: Diataxis guides, reference, explanations, and tutorials.
-- `specs/`: Specifications and reference material; excluded from Biome checks.
-- `dist/`: Build output; ignored by Git and excluded from Biome checks.
-- `test/`: Forge app tests (Vitest) and optional evaluations.
-- `scripts/`: Forge setup and deployment helpers.

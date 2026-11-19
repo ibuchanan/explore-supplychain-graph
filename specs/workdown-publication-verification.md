@@ -4,9 +4,11 @@
 
 The user clarified that `publication.published` is a JSON-RPC 2.0 notification,
 not a Forge App Event, and selected internal destination-local dispatch.
-The notification has `jsonrpc`, `method`, and identity-only `params`, without
-an `id`. No Forge `event` or `trigger` module is involved. External HTTP delivery
-and Automation integration remain later work.
+The notification is declared under the OpenRPC `x-notifications` extension,
+renamed from `x-events` at the user's request to avoid confusion with Forge events.
+It has `jsonrpc`, `method`, and identity-only `params`, without an `id`.
+No Forge `event` or `trigger` module is involved. External HTTP delivery and
+Automation integration remain later work.
 
 The approved `publication.status` contract is active in `src/openrpc.json`, with
 latest retained and latest acknowledged sequences read from one consistent
@@ -79,6 +81,128 @@ format/static checks, Forge lint and bundle size. Its final result is recorded
 on the scratch ticket: **223 tests / 10 files pass**, full check passes, and
 bundle size is **23.77 kB / 32 kB**. Runtime dependency audit reports six moderate and no
 high/critical advisories; no unrelated dependency upgrades were attempted.
+
+## Development-site follow-up — 2026-11-19
+
+The user deployed development version 5.0.0, upgraded the installation on
+`one-atlas-devb.atlassian.net` with `write:object:jira`, and reported connector
+activation. The deployed discovery suite passed four tests with two deferred
+security-fixture checks skipped. That suite permits an unpublished retained
+sequence and does not prove ingestion acknowledgment.
+
+The separate `npm run test:deployed:publication` check then failed with
+`retainedSequence: 1` and `publishedSequence: null`. This establishes that the
+current retained update was not recorded as published, not which ingestion or
+storage boundary failed. Existing Forge logs showed successful RPC completion
+but no ingestion diagnostics; the cloud cause remains unresolved.
+
+A follow-up diagnostic patch reports fixed stage/outcome labels for connector
+lifecycle, runtime binding admission, graph acknowledgment, publication storage,
+and notification delivery. No document content, connection/document identity,
+credentials, SDK response bodies, or raw exception messages are logged.
+Authorization checks and acknowledgment requirements remain unchanged. Local
+regressions include sanitized SDK exceptions and acknowledgment-storage failure
+without loss of retained content. `npm run check` passes **225 tests / 10 files**;
+bundle size is **24.3 kB / 32 kB**. Existing static advisories remain.
+
+These diagnostics have not been deployed or exercised on the platform. After
+user-controlled deployment, rerun `npm run test:deployed:publication` and inspect
+bounded Forge logs before changing any admission or acknowledgment logic. This
+patch is not evidence that the cloud failure is fixed. No additional live
+mutation, connector reactivation, or ingestion retry was performed by the agent.
+
+### Development 5.1.0 diagnostic result
+
+The user deployed 5.1.0 and reran the strict test at 17:11:45 local time;
+retained sequence 1 still had a null published sequence. Forge logs for that
+invocation at `2026-11-19T22:11:53Z` show `graph-binding: bound` followed by
+`graph-ingestion: not-acknowledged`, then successful RPC completion. Thus the
+binding lookup succeeded and the SDK call returned a result that failed the
+acknowledgment predicate; no acknowledgment-storage write was attempted.
+This does not distinguish SDK failure, rejected objects, or absent/mismatched
+acceptance. The installed SDK returns API failures as `success: false` with an
+`originalError` rather than necessarily throwing.
+
+A second local diagnostic slice adds only SDK success, accepted/rejected counts,
+matching-identity boolean, and a validated numeric HTTP status when available.
+Raw response/error text remains excluded; publication criteria are unchanged.
+The regression was observed failing before implementation, then passing.
+Full `npm run check`: **226 tests / 10 files**, **24.46 kB / 32 kB**.
+This response-classification patch has not been deployed; cloud cause and
+acknowledgment remain unresolved. No agent ingestion retry was performed.
+
+### Development 5.2.0: graph HTTP 401
+
+The user deployed 5.2.0 and reran the strict test at 17:17:18 local time.
+Logs at `2026-11-19T22:17:26.527Z` show a bound connector followed by
+`sdkSuccess: false`, `acceptedCount: 0`, `rejectedCount: 0`,
+`matchingAccepted: false`, and `httpStatus: 401`. Invocation:
+`d43b4264-d443-4632-ae9d-d2f6a1aa7b4d`.
+
+This identifies graph-service authentication/authorization rejection, not an
+object validation rejection or publication-storage failure. The precise cause
+of that HTTP 401 is not yet established. Read-only `forge install list --json`
+reports the Jira development installation as major version `5 (Latest)`,
+`Up-to-date`. The manifest declares the documented ingestion scope
+`write:object:jira`. SDK 5.4.0 uses Forge app authentication through
+`__fetchProduct` with provider `app`, remote `stargate`, type `fpp`; it does not
+forward the caller's Basic credential to the graph endpoint. The official
+connector tutorial explicitly supports ingestion from a webtrigger.
+
+No additional code, scope, deployment, connector reactivation, or ingestion
+retry was performed for this investigation. Another deploy or broadened scope
+is not justified by the current evidence. Next investigation needs the graph
+service's authentication failure reason or a platform trace, without disclosing
+request content or credentials. Ticket remains open.
+
+### Trace diagnostic and connector review — 2026-11-19 17:43
+
+Added optional graph-service `traceId` from the SDK's dedicated
+`originalError.traceId` field. Only exactly 32 hexadecimal characters are
+reported; absent, non-string, oversized, newline-bearing, or other malformed
+values are omitted. No extraction from arbitrary error text or response body.
+Existing graph logging already forwards these explicitly selected diagnostic
+fields. Admission and acknowledgment criteria are unchanged. Regression red
+then green; full `npm run check`: **227 tests / 10 files**, **24.53 kB / 32 kB**.
+Not deployed and no live retry performed.
+
+Consulted `forge-connector`: current named SDK import, KVS storage and
+success/rejection checking match its guidance. Its read/write/delete scope
+troubleshooting suggestion concerns HTTP 403, not an established HTTP 401 fix.
+No scope expansion was made. The official connector tutorial explicitly uses a
+web trigger, so a task runner is not proven necessary:
+<https://developer.atlassian.com/platform/teamwork-graph/build-a-teamwork-graph-connector/>.
+
+The user independently confirmed Wonder objects through Rovo Search. Discourse
+uses the exact same installed API 8.5.0 / graph SDK 5.4.0 versions and identical
+transport, with ingestion in a platform-managed connector task runner. Next
+checks: obtain the service trace on an authorized deployed retry; verify in
+Atlassian Administration that the active Workdown connection belongs to this
+app/environment/site and corresponds to the saved lifecycle binding; if still
+unresolved, approve a controlled same-object ingestion comparison between
+connector callback and webtrigger contexts. Do not disconnect/reconnect blindly:
+connector deletion removes ingested data. No callback ingestion hook, extra
+scope, or orchestration module was added by this review.
+
+### Development 5.3.0: service trace captured
+
+User deployed 5.3.0 and reran the strict check at 17:47:39 local time;
+retained sequence 1 remained unpublished. At `2026-11-19T22:47:46.833Z`,
+graph ingestion returned HTTP 401, SDK success false, zero accepted/rejected
+objects, and no matching acceptance. Binding lookup succeeded.
+
+- Graph service trace ID: `c2582436ceff409783076c3ff9b1511e`
+- Forge invocation ID: `c80cebba-789b-4ca5-aba2-d14cd93e38a1`
+- App: `ari:cloud:ecosystem::app/dafd6b90-4561-4a15-960f-758ff81672cd`
+- Environment: development; deployment 5.3.0
+- Jira site: `one-atlas-devb.atlassian.net`
+
+Trace instrumentation is now verified on-platform. The service rejection reason
+is still unknown; no available tool here resolves this graph service trace into
+backend authentication logs. No further instrumentation, deployment, scope
+change, or agent ingestion retry was performed. Use this correlation evidence
+for platform investigation, or explicitly approve a controlled invocation-context
+comparison. Ticket remains open.
 
 ## Outstanding platform gates — ticket remains open
 

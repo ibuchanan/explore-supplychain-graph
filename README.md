@@ -1,50 +1,106 @@
-> Please remove this quote block and replace the others with meaningful content. If you're looking at this on Bitbucket, be assured that it looks great on GitHub.
-
 # explore-supplychain-graph
 
-[![Atlassian license](https://img.shields.io/badge/license-Apache%202.0-blue.svg?style=flat-square)](LICENSE) [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](CONTRIBUTING.md)
+<!-- cspell:words Workdown workdown supplychain Frontmatter Rovo -->
 
-> Provide an introduction/overview of your project, and articulate the problem it solves for the broader engineering community. Potential consumers should understand **what** the project is, and **why** it exists.
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg?style=flat-square)](LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](CONTRIBUTING.md)
 
-> Other recommended badges are a [version](https://shields.io/category/version) badge (e.g. `npm`) and a [build](https://shields.io/category/build) badge (e.g., `circleci` or `travis`). Order should be `license - version - build - PRs`. Please use the `flat-sqare` style.
->
-> See e.g.
->
-> [![npm version](https://img.shields.io/npm/v/react-beautiful-dnd.svg?style=flat-square)](https://www.npmjs.com/package/react-beautiful-dnd) [![npm version](https://img.shields.io/npm/v/@atlaskit/button.svg?style=flat-square)](https://www.npmjs.com/package/@atlaskit/button) [![Build Status](https://img.shields.io/travis/stricter/stricter/master?style=flat-square)](https://travis-ci.org/stricter/stricter)
+An exploratory Atlassian Forge app for exporting eligible Jira Epics as
+**Workdown**—Markdown with structured YAML Frontmatter—and exchanging retained
+documents for discovery through Teamwork Graph and Rovo.
 
-## Usage
+This repository is for developers exploring caller-authorized Jira export,
+versioned document exchange, and explicit graph-ingestion acknowledgment.
+It is not a complete cross-site supply-chain integration.
 
-> Provide a simple and concise (code) example of your project. Consumers should understand **how** your project solves their problem.
+## Current state
 
-## Installation
+- Authenticated JSON-RPC supports Epic export, a development-only loopback
+  Exchange, retained-document retrieval, and Publication status.
+- The **Workdown** connector projects retained content as an
+  `atlassian:document`. Publication requires a matching accepted-object response;
+  retaining a document is not the same as publishing it.
+- **Cloud blocker, 2026-11-19:** development 5.3.0 retains documents, but graph
+  ingestion returns HTTP 401. End-to-end Publication and Rovo Search visibility
+  remain unverified for this app. See the
+  [verification record](specs/workdown-publication-verification.md).
+- There is no implemented cross-site delivery or scheduled refresh. The current
+  document link points to the source Jira issue, not a destination-local viewer.
 
-> Provide instructions on how to install and configure the project.
+**Disclosure warning:** graph documents use destination-workspace visibility;
+source Jira permissions are not replicated. Use only content approved for that
+boundary. See the [disclosure decision](specs/adr/0002-workdown-disclosure-boundary.md).
+
+## Try the local checks
+
+Use Node.js 24 and npm from the repository root:
+
+```sh
+npm install
+npm run check
+```
+
+This runs local tests, static checks, and build/size validation. It does not
+call the deployed integration tests or prove graph ingestion works. No Jira
+credential is needed by the local tests; the full gate also requires the Forge
+CLI for manifest linting. See [workstation setup](DEVELOPMENT.md#prepare-your-workstation)
+for tool prerequisites.
+
+## Set up a development installation
+
+You need access to a Forge app registration, an approved Jira development site,
+and an organization admin who can create its connector connection. The tooling
+uses Bun, SecretSpec, and Fence Rider alongside the Forge CLI.
+
+1. Follow [local configuration](DEVELOPMENT.md#configure-local-tooling-without-exposing-secrets)
+   to select the target and configure approved providers. A separately owned
+   clone needs its own app registration. Never commit credentials.
+2. Review the manifest's scopes and egress. After approval, deploy and install
+   on the selected Jira site:
+
+   ```sh
+   npm run forge:deploy
+   npm run forge:install
+   ```
+
+   The deploy script explicitly targets development. For an existing
+   installation with permission changes, use `npm run forge:upgrade` instead
+   of a first installation. These commands change remote state.
+3. Create the **Workdown** connection using the
+   [admin UI guide](docs/how-to/how-to.md). Connection creation saves a binding;
+   it does not ingest documents.
+4. Configure the local test inputs and independently known issue scenarios as
+   described in [deployed-test setup](DEVELOPMENT.md#configure-deployed-test-inputs).
+   After authorizing retention and possible graph writes, run:
+
+   ```sh
+   npm run test:deployed:publication
+   ```
+
+   The test starts or repeats the configured loopback Exchange. It does not
+   edit Jira issues, but may publish their exported content to Teamwork Graph.
+   Matching retained/published sequences prove app-recorded acknowledgment,
+   not Search visibility. **The current known 401 makes this check fail.**
+
+Do not disconnect/reconnect as a harmless reset: Atlassian deletes data ingested
+through the disconnected connector.
 
 ## Documentation
 
-> If your project is small and simple enough, documentation can be added here. For larger projects, provide a link to where the documentation lives.
+- [Development guide](DEVELOPMENT.md): edit/check loop, contracts, authentication,
+  cloud-test boundaries, and troubleshooting.
+- [Admin connection guide](docs/how-to/how-to.md): create and verify UI setup.
+- [JSON-RPC contract](src/openrpc.json): supported Commands and internal
+  `publication.published` notification (`x-notifications`), not Forge App Events.
+- [Workdown specification](specs/workdown-spec.md) and
+  [glossary](GLOSSARY.md): document format and domain vocabulary.
 
-## Tests
+## Contributing and security
 
-> Describe and show how to run the tests with code examples.
-
-## Contributions
-
-Contributions to explore-supplychain-graph are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+Contributions are welcome; start with [CONTRIBUTING.md](CONTRIBUTING.md) and
+follow the [Code of Conduct](CODE_OF_CONDUCT.md). Report vulnerabilities using
+[SECURITY.md](SECURITY.md), not a public issue.
 
 ## License
 
-Copyright (c) [YYYY] Atlassian US., Inc.
-Apache 2.0 licensed, see [LICENSE](LICENSE) file.
-
-<br/>
-
-> Pick one of the following:
-
-[![With ❤️ from Atlassian](https://raw.githubusercontent.com/atlassian-internal/oss-assets/master/banner-cheers.png)](https://www.atlassian.com)
-
-[![With ❤️ from Atlassian](https://raw.githubusercontent.com/atlassian-internal/oss-assets/master/banner-with-thanks.png)](https://www.atlassian.com)
-
-[![With ❤️ from Atlassian](https://raw.githubusercontent.com/atlassian-internal/oss-assets/master/banner-with-thanks-light.png)](https://www.atlassian.com)
-
-[![With ❤️ from Atlassian](https://raw.githubusercontent.com/atlassian-internal/oss-assets/master/banner-cheers-light.png)](https://www.atlassian.com)
+Apache License 2.0. See [LICENSE](LICENSE).
