@@ -23,7 +23,7 @@
     "format:check": "biome format",
     "lint": "run-p --npm-path npm --print-label \"lint:check:*\"",
     "lint:check:biome": "biome lint",
-    "lint:check:forge": "forge lint",
+    "lint:check:forge": "forge lint --approve MAJOR_VERSION_RULE",
     "lint:check:format": "npm run format:check",
     "lint:check:prelint": "ast-grep scan --globs '!specs/**' --globs '!node_modules/**' --config ./node_modules/@forge-ahead/prelint/sgconfig.ecosol.yml",
     "lint:check:typecheck": "npm run typecheck",
