@@ -103,7 +103,37 @@ modified. Existing `workdown.export` remains unchanged.
   critical advisories. Dependency remediation is not silently mixed into this
   feature. Review before release.
 
-No deployment, installation, upgrade, or live-site write was performed. Ticket
-20 is locally implemented, not closed: scope/upgrade approval and single-site
-platform evidence remain explicit gates. No second installation is required for
-that verification; real peer operation is not enabled by local tests.
+At initial implementation, no deployment, installation, upgrade, or live-site
+write was performed. No second installation is required for verification; real
+peer operation is not enabled by local tests.
+
+### Installed-app verification attempt — 2026-11-19
+
+The user supplied successful development **4.0.0** deployment and installation
+upgrade output, including approval of `storage:app`. That resolves the earlier
+scope/upgrade approval gate; it does not establish runtime behavior.
+
+- `npm run check` now passes, including Forge lint. After the fix below,
+  **208 tests / 8 files** pass; the size check remains **19.94 kB / 32 kB**.
+- The deployed suite first rejected the outdated ignored scenario file before
+  network calls. Its missing child/description expectations were copied from
+  the checked-in public fixture for the same issue, not from exported output.
+- The next deployed run failed all **4 active tests**, with **2 previously
+  deferred security scenarios skipped**. Discovery and start returned HTTP
+  **424**, not the expected authentication response; exports also returned 424.
+- Recent development `forge logs` identified a startup `MODULE_NOT_FOUND` for
+  `ajv/dist/runtime/ucs2length` in `src/generated/validators.js`. No request,
+  credential, endpoint, issue content, or returned Workdown is recorded here.
+- Ajv-generated standalone validators retain runtime helper imports. Ajv was
+  declared only as a development dependency. Moved the existing dependency to
+  production dependencies without changing its resolved version. A regression
+  check of generated helpers against production dependency declarations failed
+  before the fix and passed afterward. This declaration check is not proof of
+  a working deployed bundle.
+- No agent deployment or installation was performed. The fix needs an approved
+  redeployment and another installed-app run. No successful storage transaction,
+  first conditional creation, concurrent start, retained read, non-admin read,
+  or changed-content race was established by this failed cloud attempt.
+
+Ticket 20 remains open for successful single-installation platform verification.
+Actual cross-installation delivery remains unverified and is not enabled.

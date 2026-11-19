@@ -19,6 +19,21 @@ const fixture = (name: string) =>
   );
 
 describe("application Command contract", () => {
+  it("declares generated validator helpers as production dependencies", () => {
+    const manifest = JSON.parse(
+      readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+    );
+    const validators = readFileSync(
+      new URL("../src/generated/validators.js", import.meta.url),
+      "utf8",
+    );
+    for (const [, specifier] of validators.matchAll(/require\("([^"]+)"\)/g)) {
+      const dependency = specifier?.startsWith("@")
+        ? specifier.split("/").slice(0, 2).join("/")
+        : specifier?.split("/")[0];
+      expect(manifest.dependencies).toHaveProperty(dependency as string);
+    }
+  });
   it("validates every approved example and rejects non-safe-integer output sequences", () => {
     for (const method of commands.methods) {
       const name = method.name as keyof typeof inputValidators;
