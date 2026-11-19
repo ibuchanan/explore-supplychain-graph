@@ -425,6 +425,69 @@ provision nor modify issues. The earlier `field-unreadable` failure was resolved
 by the catalog-validation correction, not by the harness; the subsequent 3.3.0
 structured deployed run passed all three tests.
 
+### Authorize the disposable Epic sequence test
+
+The ordinary deployed export tests require Jira reads, not Jira issue writes.
+The previously recorded classic read scheme is `read:jira-user` plus
+`read:jira-work` (or sufficient granular equivalents); the actual token scope
+configuration has not been inspected. Read success does not establish write
+access.
+
+`test/exchange-sequence.deployed.test.ts` is a separate, explicitly opt-in test.
+It creates a disposable Epic, changes its description, and restores it while
+checking concurrent Exchange sequence allocation. Keep existing read scopes and
+add the write scopes supported by your API-token scope picker:
+
+| Operation                                            | Classic scope     | Granular alternative listed by Jira                                                                                 |
+| ---------------------------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Create Epic: `POST /rest/api/3/issue`                | `write:jira-work` | `write:issue:jira`, `write:comment:jira`, `write:comment.property:jira`, `write:attachment:jira`, `read:issue:jira` |
+| Edit/restore: `PUT /rest/api/3/issue/{issueIdOrKey}` | `write:jira-work` | `write:issue:jira`                                                                                                  |
+
+Checked against Jira's REST v3 OpenAPI contracts on 2026-11-19. The contracts
+recommend classic scopes; their granular alternatives are marked Beta. If the
+scoped API-token picker offers only granular scopes, use the documented granular
+set plus the read scopes needed by the existing tests. Do not assume
+`write:issue:jira` alone satisfies the create endpoint's published scope set.
+The classic route needs only one additional scope, `write:jira-work`; this is
+not a claim that the individual fields used by the test require every granular
+capability listed by the endpoint. See [Create issue][create-issue-api] and
+[Edit issue][edit-issue-api].
+
+The credential owner also needs these Jira permissions in the test project:
+
+- **Browse projects** and **Create issues** for creation.
+- **Browse projects** and **Edit issues** for editing/restoring; permission to
+  view the issue if issue-level security applies.
+- The existing development RPC authentication additionally requires an active
+  user with the Jira **ADMINISTER** global permission. Being a Jira admin does
+  not replace project permissions. The Epic must satisfy the export eligibility
+  rules and its description must be editable.
+
+No delete permission or admin-write token scope is needed by this scenario. It
+leaves the Epic for inspection; restoration preserves Jira history, automation
+side effects and the advanced Exchange sequence. Its identity/recovery record
+is stored in Git-ignored `test/exchange-sequence.local.json`. Each run creates
+another Epic; obtain approval for the target and write activity before running.
+
+Store a suitably scoped credential as `WORKDOWN_TEST_API_TOKEN` through the
+existing SecretSpec workflow; never put its value in chat, a scenario file, or
+a commit. This grants writes to the **test credential**, not to the Forge app:
+no manifest scope, app-access fallback, deployment or installation change is
+required. The existing read-only token can still run ordinary read scenarios.
+A create request returned HTTP 401 with the previous credential; missing write
+scope is consistent with the recorded read scheme but was not independently
+confirmed as the cause.
+
+With the approved credential, site and scenario configured:
+
+```sh
+secretspec run --scope '' -- env WORKDOWN_DEPLOYED_TEST=1 WORKDOWN_SEQUENCE_TEST=1 \
+  ./node_modules/.bin/vitest run test/exchange-sequence.deployed.test.ts
+```
+
+[create-issue-api]: https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/#api-rest-api-3-issue-post
+[edit-issue-api]: https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/#api-rest-api-3-issue-issueidorkey-put
+
 ### Use them
 
 Check that the names resolve without printing values:
