@@ -118,6 +118,52 @@ it("reports a validated service trace ID but excludes malformed IDs and raw erro
   }
   expect(JSON.stringify(reports)).not.toContain("private");
 });
+it("matches runtime and documented acknowledgment identities without accepting unrelated objects", async () => {
+  const reports: unknown[][] = [];
+  let accepted: unknown;
+  let rejected: unknown[] = [];
+  const ingest = createGraphPublisher({
+    connectionId: async () => "private-connection",
+    setObjects: async () => ({
+      success: true,
+      results: { accepted: [accepted], rejected },
+    }),
+    report: (...args) => reports.push(args),
+  });
+  for (const entityId of [
+    { entityId: record.document },
+    { id: record.document },
+  ]) {
+    accepted = { entityType: "atlassian:document", entityId };
+    expect(await ingest(record, binding)).toBe(true);
+    rejected = [{}];
+    expect(await ingest(record, binding)).toBe(false);
+    rejected = [];
+  }
+  for (const mismatch of [
+    { entityType: "document", entityId: { entityId: record.document } },
+    {
+      entityType: "atlassian:message",
+      entityId: { entityId: record.document },
+    },
+    { entityType: "atlassian:document", entityId: { entityId: "other" } },
+    {
+      entityType: "atlassian:document",
+      entityId: { entityId: "other", id: record.document },
+    },
+    {
+      entityType: "atlassian:document",
+      entityId: { externalId: record.document },
+    },
+    { entityType: "atlassian:document", entityId: record.document },
+    { entityType: "atlassian:document" },
+  ]) {
+    accepted = mismatch;
+    expect(await ingest(record, binding)).toBe(false);
+  }
+  expect(JSON.stringify(reports)).not.toContain(record.document);
+  expect(JSON.stringify(reports)).not.toContain("private");
+});
 it("dispatches only valid identity-only JSON-RPC notifications to local handlers and propagates delivery failure", async () => {
   const seen: unknown[] = [];
   const dispatch = createPublicationDispatcher([

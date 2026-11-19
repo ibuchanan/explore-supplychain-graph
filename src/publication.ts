@@ -96,7 +96,8 @@ export function createGraphPublisher(deps: {
         result.results?.accepted?.some(
           (accepted) =>
             accepted.entityType === "atlassian:document" &&
-            accepted.entityId?.["id"] === record.document,
+            (accepted.entityId?.["entityId"] ?? accepted.entityId?.["id"]) ===
+              record.document,
         ) === true;
       const acknowledged =
         result.success === true &&

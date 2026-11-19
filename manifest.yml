@@ -40,6 +40,8 @@ permissions:
   scopes:
     - storage:app
     - write:object:jira
+    - read:object:jira
+    - delete:object:jira
   external:
     fetch:
       backend:
