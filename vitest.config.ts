@@ -2,6 +2,7 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
+    silent: "passed-only",
     exclude: [
       ...(process.env["WORKDOWN_DEPLOYED_TEST"] === "1"
         ? []
