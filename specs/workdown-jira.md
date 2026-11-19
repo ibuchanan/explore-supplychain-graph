@@ -451,14 +451,14 @@ future Exchange, never the request API token. Every later publication must
 re-read the Epic and complete eligible children under that principal's current
 permissions. If a supported user-authorized execution mechanism is unavailable,
 fail closed; event-triggered app access cannot replace it. Account replacement
-requires fresh authorization. Ticket 15 must implement and verify that mechanism
+requires fresh authorization. The republish-on-change work must implement and verify that mechanism
 before automatic republishing is usable. No principal is persisted by this
 stateless export ticket.
 
 No event subscriptions were added and no permission/security mutations were
 performed. Usable events for security-level, permission or principal changes
 remain unverified; do not assume events cover every eligibility change. Child
-listing remains ticket 06, and automatic publication remains gated by ticket 15.
+listing remains ticket 06, and automatic publication remains gated by the republish-on-change work.
 
 **Verification boundary:** local authenticated webtrigger tests cover eligible,
 ineligible, forbidden, and indeterminate outcomes, caller credential routing,
@@ -608,8 +608,8 @@ seams; no private-helper mocks or new test framework were introduced.
 
 No deployment, installation, live-data changes, or cloud log readback was
 performed for ticket 08. The caps are locally enforced application policies,
-not verified TWG ingestion/storage capacities. Ticket 14 owns deployed
-confirmation; ticket 13 owns retention of a previous successful document.
+not verified TWG ingestion/storage capacities. The TWG ingestion work owns deployed
+confirmation; the Exchange and document-storage work owns retention of a previous successful document.
 There are no new modules, permissions, egress destinations, dependencies, or
 storage writes.
 

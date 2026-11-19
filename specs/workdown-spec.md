@@ -498,17 +498,17 @@ Rationale and official sources (consulted 2026-11-18):
   summaries are embedded in one document, not individual TWG objects: that
   batch limit does **not** impose an actual 100-child ingestion restriction.
 
-Both values are provisional. Ticket 14 must confirm or adjust them against
+Both values are provisional. The TWG ingestion work must confirm or adjust them against
 actual deployed TWG ingestion and the chosen storage/delivery path before
 operational use. No such ingestion, storage, or worst-case cloud payload check
-has been performed for ticket 08. Async events must carry references rather
+has been performed for the export-limits work. Async events must carry references rather
 than assuming that a full document fits their separate event payload limits.
 
 Limit errors contain only their stable code/message and no document, source
 values, counts, or diagnostics. Other incomplete or invalid candidates also
 fail whole. Repeating an unchanged successful export yields identical canonical
 bytes; no hash, retry timestamp, or new revision field is required. Storage and
-retention of the previous successful document on failure belong to ticket 13.
+retention of the previous successful document on failure belong to the Exchange and document-storage work.
 
 Source-specific test suites, fixtures, and acceptance gates are documented in
 companion profiles; see [Source profiles](#source-profiles).

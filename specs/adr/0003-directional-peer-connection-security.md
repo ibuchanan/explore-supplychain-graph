@@ -76,8 +76,8 @@ Commands, and an admin token cannot substitute for a peer credential.
    fresh operationally authenticated readiness acknowledgment. A bootstrap
    acknowledgment alone is not evidence that the destination is ready.
 
-Invitation import and the one-time bundle result must be covered in ticket 10's
-user-authored contract; acceptance and readiness belong to ticket 11. If the
+Invitation import and the one-time bundle result must be covered in the invite-and-inspect Commands'
+user-authored contract; acceptance and readiness belong to the accept Command. If the
 proposed contract omits these steps, stop for its update rather than inventing
 an agent-owned method. No UI is required to exercise these Command seams.
 
@@ -227,10 +227,31 @@ publishing failed. Logs, a no-op publisher, and “event queued” without durab
 acknowledgment are not substitutes. Authentication/authorization failures use
 sanitized reasons and never copy raw requests into the audit sink.
 
-There is currently no app audit publisher. Ticket 10 must supply this adapter
+There is currently no app audit publisher. The invite-and-inspect work must supply this adapter
 and test its failure behavior, or remain blocked. Reuse the backbone event and
 port contracts rather than inventing a second audit protocol. This ADR does
 not claim that console output or an unverified Forge event meets the contract.
+
+## Addendum: loopback Connection as a development test seam (2026-11-19)
+
+Delivery of the functional Exchange flow is sequenced before the real
+invitation, acceptance, and revocation work. Until those exist, the Exchange
+work may use one hardcoded loopback Connection whose source and destination are
+the same installation, so a shared document lands in that site's own TWG. This
+is additive and does not widen disclosure beyond the approved export boundary.
+
+The loopback is a test seam, not a trust model. It replaces only the peer
+handshake; it never relaxes caller authentication, Project Admin
+authorization, eligibility, or disclosure checks, and it does not stand in for
+message authentication between distinct installations.
+
+- It is fixed in code. No Command can create, edit, accept, or revoke it.
+- Every Command result that names it marks it as a loopback.
+- It is disabled outside development environments.
+- It is not valid evidence that remote delivery, installation binding, or
+  network handshake compatibility works; those remain unverified until exercised.
+- When real accepted Connections exist, the loopback is removed or demoted
+  behind a development-only switch, and this addendum is updated to say which.
 
 ## Alternatives considered
 
@@ -252,7 +273,7 @@ not claim that console output or an unverified Forge event meets the contract.
 ## Implementation and test gates
 
 This documentation-only ticket adds no testable Command or new test seam.
-Tickets 10–12 must use the already approved business Command, JSON-RPC, and
+The invite, accept, and revoke work must use the already approved business Command, JSON-RPC, and
 deployed peer seams, one red/green behavior at a time. Cover wrong admin/site,
 wrong direction, body tampering, expired/replayed invitations and requests,
 conflicting retries, missing audit acknowledgment, terminal-state races, and
@@ -282,7 +303,7 @@ Required before implementation can be called complete:
 No change to the agreed product scope is intended. Explicit import is the
 chosen discovery handshake; reconnect is the chosen rotation policy. The
 revocation control-plane exception above is a wording clarification that must
-be preserved in tickets 12 and 18 and their contracts. Any requirement for
+be preserved in the revoke and withdrawal work and their contracts. Any requirement for
 automatic discovery, in-place rotation, or guaranteed remote convergence would
 change this decision and requires user approval, not silent implementation.
 
