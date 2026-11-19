@@ -7,7 +7,7 @@
   },
   "methods": [
     {
-      "name": "exchanges.start",
+      "name": "exchange.start",
       "summary": "Start sharing an Epic over an active outbound Peer Connection",
       "description": "Mutation. Authenticate the caller within the source installation and independently verify current Project Admin authority for the Epic's project at the business boundary. Read and generate through the same caller-scoped eligibility and disclosure behavior as workdown.export. Require an active outbound Connection; pending, revoked, reverse-direction, unknown, or unavailable Connections fail without revealing their state. No destination project, Epic, or per-Exchange destination approval is accepted or required. In ticket 20 only the fixed development-only loopback Connection is available. Resolve the issue key or ID to stable source identity. The pair of Connection and stable Subject identity identifies one Exchange and one document: repeating start never creates another Exchange. Each invocation attempts immediate generation and delivery, including when the Exchange already exists. Allocate a sequence only for changed canonical Workdown bytes; retries of a candidate reuse its identity, sequence, and bytes. Successful completion means the destination durably accepted that candidate or already holds the same or a newer sequence. The returned sequence is the actual destination-held sequence at acknowledgment, not a promise it remains current. No TWG ingestion, Search visibility, Publication, or notification is implied. Generation failure creates no candidate and leaves any previous successful document intact. Once generation succeeds, a failed or uncertain delivery may leave a durable Exchange/candidate or an accepted destination document; an error is not a rollback guarantee. Repeating start is safe for the same Connection and Subject, but may generate a newer candidate if Jira content changed. Concurrent starts must not allocate conflicting sequences or replace newer destination content with older content. Errors expose only code and message, never source data, partial Workdown, credentials, or storage diagnostics.",
       "paramStructure": "by-name",
@@ -32,7 +32,7 @@
       ],
       "result": {
         "name": "Accepted current document",
-        "description": "A destination-acceptance acknowledgment, not a Publication receipt. Use connection and document with documents.get; no separate Exchange or Publication ID is introduced.",
+        "description": "A destination-acceptance acknowledgment, not a Publication receipt. Use connection and document with document.get; no separate Exchange or Publication ID is introduced.",
         "schema": {
           "type": "object",
           "additionalProperties": false,
@@ -82,7 +82,7 @@
       ]
     },
     {
-      "name": "documents.get",
+      "name": "document.get",
       "summary": "Read the latest retained Workdown at the destination",
       "description": "Read-only. Authenticate a reader within the destination installation's site boundary. Source-site access, Project Admin authority, and a destination project or Epic are not required: shared content is unrestricted within that destination boundary under ADR 0001, never public internet content. Resolve the incoming Connection and document only within the trusted local installation, never from caller-supplied site identities or endpoints. The fixed development loopback may act as both outbound and incoming only in development. Require an active incoming Connection and a currently retained document; an unknown, wrong-direction, pending, revoked, or unavailable Connection yields Connection unavailable without state details. A missing or withdrawn document on an accessible active incoming Connection yields Document unavailable. Return the stored Workdown bytes and their actual stored sequence together from one consistent read. No Jira regeneration, historical version selection, source authorization check, TWG query, or ingestion acknowledgment is implied. A later sequence than the event or start acknowledgment is valid. Storage failure must never masquerade as a missing document. Lifecycle checks must fence reads against locally committed revocation; already-disclosed copies cannot be recalled. Errors expose only code and message, never document content or diagnostics.",
       "paramStructure": "by-name",

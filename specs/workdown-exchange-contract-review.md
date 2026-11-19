@@ -11,8 +11,8 @@ these Command definitions is separate.
 
 | Command | Inputs | Successful result |
 | --- | --- | --- |
-| `exchanges.start` | `connection`, `profile: jira-epic`, `issue` | Connection, loopback marker, document identity, actual destination-held sequence |
-| `documents.get` | `connection`, `document` | Connection, loopback marker, document identity, actual stored sequence, Workdown bytes |
+| `exchange.start` | `connection`, `profile: jira-epic`, `issue` | Connection, loopback marker, document identity, actual destination-held sequence |
+| `document.get` | `connection`, `document` | Connection, loopback marker, document identity, actual stored sequence, Workdown bytes |
 
 - Start requires current source Project Admin authority and caller-scoped export
   checks. Read requires an authenticated destination-site reader, not source
@@ -67,11 +67,11 @@ The existing export retry classifications remain unchanged.
 Intent → caller-facing Commands → reviewed `x-forge-ahead` metadata → existing
 webtrigger/dispatcher → business authorization, generation, delivery and storage.
 
-- `exchanges.start`: `web: true`, `execution: asUser`, `audit: standard`.
+- `exchange.start`: `web: true`, `execution: asUser`, `audit: standard`.
   This shares curated content under existing trust, rather than changing trust.
   ADR 0003 marks invite/import/accept/revoke critical; this draft does not silently
   add a durable critical-audit gate for start. Confirm this classification.
-- `documents.get`: `web: true`, `execution: asApp`, `audit: standard` for app-owned
+- `document.get`: `web: true`, `execution: asApp`, `audit: standard` for app-owned
   destination storage. `asApp` grants no caller permission and never bypasses
   destination membership or lifecycle checks.
 - The existing web adapter requires Jira Site Admin authority for every request.
