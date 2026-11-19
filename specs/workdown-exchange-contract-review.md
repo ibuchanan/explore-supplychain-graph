@@ -227,3 +227,39 @@ No source edits, storage deletion, test-only Command, or authentication bypass w
 introduced to manufacture that evidence. Additional controlled fixture work or an
 explicit user decision on the remaining gate is required before full closure.
 Actual cross-installation delivery remains unverified and is not enabled.
+
+### Disposable Epic sequence scenario — 2026-11-19
+
+The user authorized a disposable test Epic for controlled description changes
+and restoration. Added `test/exchange-sequence.deployed.test.ts`, using the
+existing validated scenarios and shared deployed RPC helper. It derives the
+project/Epic type from the configured successful company-managed example and
+uses synthetic descriptions only. No production Command or bypass was added.
+
+The opt-in scenario expects first acceptance at sequence 1; two starts after a
+confirmed source edit must agree on sequence 2; after restoring the source,
+two starts must agree on sequence 3. Reads verify each retained description and
+sequence, and repeated starts must reuse 2/3. Restoration is attempted in a
+`finally` block on failure. A successfully created Epic is left for inspection;
+its identity/recovery status is written only to Git-ignored
+`test/exchange-sequence.local.json`. Jira history and app storage are not erased.
+The scenario does not claim deterministic interleaving of different generations.
+
+Execution (only with approved create/edit-capable credentials and target):
+
+```sh
+secretspec run --scope '' -- env WORKDOWN_DEPLOYED_TEST=1 WORKDOWN_SEQUENCE_TEST=1 \
+  ./node_modules/.bin/vitest run test/exchange-sequence.deployed.test.ts
+```
+
+The actual run failed at Jira **POST issue, HTTP 401** after successful metadata
+reads. No successful create response or issue key was returned; no edit, start,
+or sequence assertion ran. No alternate credential or auth bypass was attempted.
+The current credential's suitability for issue writes is unverified; the exact
+cause of the 401 was not established. Supply a suitably scoped create/edit
+credential securely before retrying. The concurrent changed-content gate remains
+open, not waived by this attempted test. Existing core 4.2.0 evidence still holds.
+
+`npm run check` passes with the new opt-in test excluded from default local runs:
+**209 local tests / 8 files**, Forge lint, freshness/typecheck/build/static/format,
+and **19.95 kB / 32 kB** size check. No deployment or installation was performed.

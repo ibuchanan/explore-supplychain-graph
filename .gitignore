@@ -249,6 +249,7 @@ tmp/
 
 # Private deployed-test issue identities and expectations
 /test/deployed.local.json
+/test/exchange-sequence.local.json
 
 # CocoIndex Code (ccc)
 /.cocoindex_code/
