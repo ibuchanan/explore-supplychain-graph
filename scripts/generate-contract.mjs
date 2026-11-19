@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { generateContract } from "@forge-ahead/rpc/generator";
 import Ajv from "ajv";
 import standaloneCode from "ajv/dist/standalone/index.js";
+import { generateContract } from "./command-contract.mjs";
 
 const artifacts = generateContract(
   JSON.parse(readFileSync("src/openrpc.json", "utf8")),

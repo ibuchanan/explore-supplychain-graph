@@ -20,11 +20,21 @@ modules:
     - key: async
       handler: index.runAsync
 permissions:
+  scopes:
+    - storage:app
   external:
     fetch:
       backend:
         - address: https://api.atlassian.com
 app:
+  storage:
+    entities:
+      - name: exchange-document
+        attributes:
+          version:
+            type: string
+          payload:
+            type: any
   runtime:
     name: nodejs24.x
     memoryMB: 256

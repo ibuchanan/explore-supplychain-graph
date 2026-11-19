@@ -54,6 +54,18 @@ export async function authenticate(
     user.accountType !== "atlassian"
   )
     return { kind: "forbidden" as const };
+  return {
+    kind: "authenticated" as const,
+    principal: { accountId: user.accountId as string, authorization },
+  };
+}
+
+export async function authenticateAdmin(
+  authorization: string,
+  installation: Installation,
+) {
+  const identity = await authenticate(authorization, installation);
+  if (identity.kind !== "authenticated") return identity;
   const permissions = await jiraGet(
     installation,
     authorization,
@@ -65,8 +77,26 @@ export async function authenticate(
   };
   if (data.permissions?.ADMINISTER?.havePermission !== true)
     return { kind: "forbidden" as const };
-  return {
-    kind: "authenticated" as const,
-    principal: { accountId: user.accountId as string, authorization },
-  };
+  return identity;
+}
+
+export async function isProjectAdmin(
+  issue: string,
+  context: CommandContext,
+): Promise<boolean> {
+  if (!issue.trim()) return false;
+  try {
+    const response = await jiraGet(
+      context.installation,
+      context.principal.authorization,
+      `mypermissions?permissions=ADMINISTER_PROJECTS&${/^\d+$/.test(issue) ? "issueId" : "issueKey"}=${encodeURIComponent(issue)}`,
+    );
+    if (!response.ok) return false;
+    const data = (await response.json()) as {
+      permissions?: { ADMINISTER_PROJECTS?: { havePermission?: unknown } };
+    };
+    return data.permissions?.ADMINISTER_PROJECTS?.havePermission === true;
+  } catch {
+    return false;
+  }
 }

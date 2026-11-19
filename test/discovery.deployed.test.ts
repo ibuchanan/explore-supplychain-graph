@@ -50,6 +50,74 @@ it("authenticates discovery through the deployed Forge webtrigger", async () => 
 }, 45_000);
 
 for (const [alias, issue] of Object.entries(scenarios.issues)) {
+  if (!("errorCode" in issue.expected)) {
+    const expectedDescription = issue.expected.description;
+    it(`starts ${alias} concurrently and reads its retained development loopback document`, async () => {
+      const params = {
+        connection: "development-loopback",
+        profile: "jira-epic",
+        issue: issue.key,
+      };
+      expect((await call("exchange.start", params, false)).status).toBe(401);
+      const responses = await Promise.all([
+        call("exchange.start", params),
+        call("exchange.start", params),
+      ]);
+      const values = responses.map(
+        (response) =>
+          response.result as {
+            connection: string;
+            loopback: boolean;
+            document: string;
+            updateSequenceNumber: number;
+          },
+      );
+      for (const value of values) {
+        expect(
+          value.connection === params.connection && value.loopback === true,
+        ).toBe(true);
+        expect(
+          Number.isSafeInteger(value.updateSequenceNumber) &&
+            value.updateSequenceNumber > 0,
+        ).toBe(true);
+      }
+      expect(values[0]?.document === values[1]?.document).toBe(true);
+      expect(
+        values[0]?.updateSequenceNumber === values[1]?.updateSequenceNumber,
+      ).toBe(true);
+      const first = values[0];
+      if (!first) throw new Error("Missing start acknowledgment");
+      expect(
+        (
+          await call(
+            "document.get",
+            { connection: params.connection, document: first.document },
+            false,
+          )
+        ).status,
+      ).toBe(401);
+      const response = await call("document.get", {
+        connection: params.connection,
+        document: first.document,
+      });
+      const retained = response.result as typeof first & { workdown: string };
+      expect(
+        retained.document === first.document && retained.loopback === true,
+      ).toBe(true);
+      expect(retained.updateSequenceNumber >= first.updateSequenceNumber).toBe(
+        true,
+      );
+      expect(validateWorkdown(retained.workdown)).toBe(true);
+      expect(
+        retained.workdown.includes(`## Description\n\n${expectedDescription}`),
+      ).toBe(true);
+      const repeated = await call("exchange.start", params);
+      expect(
+        (repeated.result as typeof first).updateSequenceNumber ===
+          retained.updateSequenceNumber,
+      ).toBe(true);
+    }, 90_000);
+  }
   it(`exports ${alias} (${issue.projectType}) through the deployed Forge webtrigger`, async () => {
     const expectedError =
       "errorCode" in issue.expected ? issue.expected.errorCode : undefined;

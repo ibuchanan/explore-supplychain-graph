@@ -10,6 +10,92 @@ const context = {
 };
 
 describe.each([runSync, runAsync])("authenticated webtrigger", (handler) => {
+  it("admits an authenticated destination reader without Jira admin permission", async () => {
+    vi.stubGlobal("fetch", async (url: string) => {
+      if (url.endsWith("/myself"))
+        return Response.json({
+          accountId: "reader",
+          active: true,
+          accountType: "atlassian",
+        });
+      throw new Error(
+        "A destination read must not request source or admin permissions",
+      );
+    });
+    const response = await handler(
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": ["application/json"],
+          Authorization: ["Basic dGVzdDpmYWtl"],
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "document.get",
+          params: { connection: "not-active", document: "unknown" },
+        }),
+      },
+      context,
+    );
+    expect(response.statusCode).toBe(200);
+    expect(JSON.parse(response.body).error).toEqual({
+      code: -32010,
+      message: "Connection unavailable",
+    });
+  });
+  it.each(["DEMO-42", "10042"])(
+    "rechecks Project Admin authority for start using %s",
+    async (issue) => {
+      let checked = false;
+      vi.stubGlobal("fetch", async (url: string) => {
+        if (url.endsWith("/myself"))
+          return Response.json({
+            accountId: "reader",
+            active: true,
+            accountType: "atlassian",
+          });
+        if (url.includes("/mypermissions?")) {
+          const query = new URL(url).searchParams;
+          expect(query.get("permissions")).toBe("ADMINISTER_PROJECTS");
+          expect(query.get(issue === "10042" ? "issueId" : "issueKey")).toBe(
+            issue,
+          );
+          checked = true;
+          return Response.json({
+            permissions: { ADMINISTER_PROJECTS: { havePermission: false } },
+          });
+        }
+        throw new Error("Unauthorized start must not export or persist");
+      });
+      const response = await handler(
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": ["application/json"],
+            Authorization: ["Basic dGVzdDpmYWtl"],
+          },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: 1,
+            method: "exchange.start",
+            params: {
+              connection: "development-loopback",
+              profile: "jira-epic",
+              issue,
+            },
+          }),
+        },
+        context,
+      );
+      expect(checked).toBe(true);
+      expect(response.statusCode).toBe(200);
+      expect(JSON.parse(response.body).error).toEqual({
+        code: -32001,
+        message: "Forbidden",
+      });
+    },
+  );
   it("rejects non-POST transport requests", async () => {
     const response = await handler({ method: "GET" }, context);
     expect(response.statusCode).toBe(405);

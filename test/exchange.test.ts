@@ -1,0 +1,323 @@
+import { readFileSync } from "node:fs";
+import { err, ok } from "@forge-ahead/errors";
+import { createWebDispatcher } from "@forge-ahead/rpc";
+import { describe, expect, it } from "vitest";
+import {
+  createExchangeCommands,
+  createLoopbackReceiver,
+  type ExchangeStore,
+  type RetainedDocument,
+} from "../src/exchange";
+import { options } from "../src/rpc";
+
+const workdown = readFileSync(
+  new URL(
+    "./fixtures/workdown-export/epic-empty-description.workdown",
+    import.meta.url,
+  ),
+  "utf8",
+);
+const document =
+  "ari:cloud:jira:00000000-0000-4000-8000-000000000001:issue/10042";
+function memory(): ExchangeStore {
+  const records = new Map<string, RetainedDocument>();
+  return {
+    async read(key) {
+      return records.get(key);
+    },
+    async compareAndSet(key, previous, value) {
+      if ((records.get(key)?.updateSequenceNumber ?? 0) !== previous)
+        return false;
+      records.set(key, structuredClone(value));
+      return true;
+    },
+  };
+}
+const params = {
+  connection: "development-loopback",
+  profile: "jira-epic" as const,
+  issue: "DEMO-42",
+};
+const context = {
+  installation: {
+    cloudId: "00000000-0000-4000-8000-000000000001",
+    apiBase:
+      "https://api.atlassian.com/ex/jira/00000000-0000-4000-8000-000000000001",
+  },
+  principal: { accountId: "source-admin", authorization: "Basic fake" },
+};
+const read = { connection: params.connection, document };
+const defaults = () => ({
+  store: memory(),
+  environment: () => "DEVELOPMENT",
+  generate: async () => ok<string, string>(workdown),
+  isProjectAdmin: async () => true,
+});
+
+describe("Exchange business Commands", () => {
+  it("serves both Commands through validated dispatcher inputs and outputs", async () => {
+    const business = createExchangeCommands(defaults());
+    const dispatch = createWebDispatcher({
+      ...options,
+      handlers: {
+        ...options.handlers,
+        "exchange.start": business.start,
+        "document.get": business.get,
+      },
+    }).dispatch;
+    expect(
+      await dispatch(
+        { jsonrpc: "2.0", id: 1, method: "exchange.start", params },
+        context,
+      ),
+    ).toMatchObject({ result: { document, updateSequenceNumber: 1 } });
+    expect(
+      await dispatch(
+        { jsonrpc: "2.0", id: 2, method: "document.get", params: read },
+        context,
+      ),
+    ).toMatchObject({
+      result: { document, workdown, updateSequenceNumber: 1 },
+    });
+    expect(
+      await dispatch(
+        {
+          jsonrpc: "2.0",
+          id: 3,
+          method: "exchange.start",
+          params: { ...params, endpoint: "https://attacker.invalid" },
+        },
+        context,
+      ),
+    ).toMatchObject({ error: { code: -32602 } });
+  });
+  it("keeps two peer roles isolated and rejects stale and conflicting duplicate deliveries", async () => {
+    const destination = memory();
+    const receive = createLoopbackReceiver(destination, () => "DEVELOPMENT");
+    const binding = {
+      cloudId: context.installation.cloudId,
+      connection: params.connection,
+    };
+    const newer = workdown.replace(
+      "No description provided.",
+      "Newer retained description.",
+    );
+    expect(
+      await receive(
+        { document, workdown: newer, updateSequenceNumber: 2 },
+        binding,
+      ),
+    ).toEqual({ value: 2 });
+    expect(
+      await receive({ document, workdown, updateSequenceNumber: 1 }, binding),
+    ).toEqual({ value: 2 });
+    expect(
+      await receive({ document, workdown, updateSequenceNumber: 2 }, binding),
+    ).toEqual({ error: "invalid-params" });
+    const reader = createExchangeCommands({
+      ...defaults(),
+      store: destination,
+    });
+    expect(await reader.get(read, context)).toMatchObject({
+      value: { workdown: newer, updateSequenceNumber: 2 },
+    });
+    const source = createExchangeCommands({ ...defaults(), deliver: receive });
+    expect(await source.start(params, context)).toMatchObject({
+      value: { updateSequenceNumber: 2 },
+    });
+  });
+  it("reuses a durable candidate after an uncertain delivery", async () => {
+    const destination = memory();
+    const receive = createLoopbackReceiver(destination, () => "DEVELOPMENT");
+    let uncertain = true;
+    const source = createExchangeCommands({
+      ...defaults(),
+      deliver: async (candidate, binding) => {
+        const result = await receive(candidate, binding);
+        if (uncertain) {
+          uncertain = false;
+          throw new Error("lost acknowledgment");
+        }
+        return result;
+      },
+    });
+    expect(await source.start(params, context)).toEqual({
+      error: "delivery-unconfirmed",
+    });
+    expect(await source.start(params, context)).toMatchObject({
+      value: { updateSequenceNumber: 1 },
+    });
+  });
+  it("starts immediately and reads retained bytes as a destination reader without source access", async () => {
+    const commands = createExchangeCommands(defaults());
+    expect(await commands.start(params, context)).toEqual({
+      value: { ...read, loopback: true, updateSequenceNumber: 1 },
+    });
+    expect(
+      await commands.get(read, {
+        ...context,
+        principal: {
+          accountId: "destination-reader",
+          authorization: "Basic reader",
+        },
+      }),
+    ).toEqual({
+      value: { ...read, loopback: true, updateSequenceNumber: 1, workdown },
+    });
+  });
+  it("reuses unchanged sequences and advances changed bytes under concurrent starts", async () => {
+    let bytes = workdown;
+    const commands = createExchangeCommands({
+      ...defaults(),
+      generate: async () => ok(bytes),
+    });
+    await commands.start(params, context);
+    expect(await commands.start(params, context)).toMatchObject({
+      value: { updateSequenceNumber: 1 },
+    });
+    bytes = workdown.replace(
+      "No description provided.",
+      "Changed description.",
+    );
+    const results = await Promise.all([
+      commands.start(params, context),
+      commands.start(params, context),
+    ]);
+    for (const result of results)
+      expect(result).toMatchObject({ value: { updateSequenceNumber: 2 } });
+    expect(await commands.get(read, context)).toMatchObject({
+      value: { workdown: bytes, updateSequenceNumber: 2 },
+    });
+  });
+  it("does not report success without an accepted same-or-newer candidate", async () => {
+    const commands = createExchangeCommands({
+      ...defaults(),
+      store: { ...memory(), compareAndSet: async () => false },
+    });
+    expect(await commands.start(params, context)).toEqual({
+      error: "delivery-unconfirmed",
+    });
+  });
+  it("rejects corrupted retained Workdown instead of disclosing it", async () => {
+    const commands = createExchangeCommands({
+      ...defaults(),
+      store: {
+        ...memory(),
+        read: async () => ({
+          document,
+          updateSequenceNumber: 1,
+          workdown: "secret corrupt bytes",
+        }),
+      },
+    });
+    expect(await commands.get(read, context)).toEqual({
+      error: "internal-error",
+    });
+  });
+  it.each(["PRODUCTION", "STAGING", "UNKNOWN"])(
+    "disables loopback in %s without generation or storage",
+    async (environment) => {
+      const commands = createExchangeCommands({
+        ...defaults(),
+        environment: () => environment,
+        generate: async () => {
+          throw new Error("must not generate");
+        },
+        store: {
+          read: async () => {
+            throw new Error("must not read");
+          },
+          compareAndSet: async () => {
+            throw new Error("must not write");
+          },
+        },
+      });
+      expect(await commands.start(params, context)).toEqual({
+        error: "connection-unavailable",
+      });
+      expect(await commands.get(read, context)).toEqual({
+        error: "connection-unavailable",
+      });
+    },
+  );
+  it.each(["pending", "revoked", "incoming", "unknown"])(
+    "rejects non-loopback Connection %s",
+    async (connection) => {
+      const commands = createExchangeCommands(defaults());
+      expect(await commands.start({ ...params, connection }, context)).toEqual({
+        error: "connection-unavailable",
+      });
+      expect(await commands.get({ ...read, connection }, context)).toEqual({
+        error: "connection-unavailable",
+      });
+    },
+  );
+  it("requires authentication and rechecks Project Admin authority without retaining anything", async () => {
+    const commands = createExchangeCommands({
+      ...defaults(),
+      isProjectAdmin: async () => false,
+      generate: async () => {
+        throw new Error("must not generate");
+      },
+    });
+    expect(await commands.start(params, context)).toEqual({
+      error: "forbidden",
+    });
+    const anonymous = {
+      ...context,
+      principal: { accountId: "", authorization: "" },
+    };
+    expect(await commands.start(params, anonymous)).toEqual({
+      error: "forbidden",
+    });
+    expect(await commands.get(read, anonymous)).toEqual({ error: "forbidden" });
+    expect(await commands.get(read, context)).toEqual({
+      error: "document-unavailable",
+    });
+  });
+  it("preserves the last successful document after generation fails", async () => {
+    let fail = false;
+    const commands = createExchangeCommands({
+      ...defaults(),
+      generate: async () => (fail ? err("issue-ineligible") : ok(workdown)),
+    });
+    await commands.start(params, context);
+    fail = true;
+    expect(await commands.start(params, context)).toEqual({
+      error: "issue-ineligible",
+    });
+    expect(await commands.get(read, context)).toMatchObject({
+      value: { workdown, updateSequenceNumber: 1 },
+    });
+  });
+  it("keeps installation identities isolated", async () => {
+    const commands = createExchangeCommands(defaults());
+    await commands.start(params, context);
+    expect(
+      await commands.get(read, {
+        ...context,
+        installation: {
+          ...context.installation,
+          cloudId: "00000000-0000-4000-8000-000000000002",
+        },
+      }),
+    ).toEqual({ error: "document-unavailable" });
+  });
+  it("reports storage failure, not a missing document or successful delivery", async () => {
+    const commands = createExchangeCommands({
+      ...defaults(),
+      store: {
+        ...memory(),
+        read: async () => {
+          throw new Error("private storage diagnostics");
+        },
+      },
+    });
+    expect(await commands.start(params, context)).toEqual({
+      error: "storage-unavailable",
+    });
+    expect(await commands.get(read, context)).toEqual({
+      error: "storage-unavailable",
+    });
+  });
+});

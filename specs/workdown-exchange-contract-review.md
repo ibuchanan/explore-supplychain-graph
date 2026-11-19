@@ -1,111 +1,109 @@
-# Ticket 20 Command contract review
+# Ticket 20 Exchange Commands
 
-Status: **draft for user approval**, 2026-11-19. Not implemented or exposed.
+The user approved the singular method names and contract on 2026-11-19.
+The binding declaration is now [`src/openrpc.json`](../src/openrpc.json).
+The former draft JSON has been removed; this document records implementation
+choices and evidence, not another contract source.
 
-The [OpenRPC draft](workdown-exchange.openrpc.draft.json) proposes additions to
-`src/openrpc.json`; the active export contract and generated artifacts are
-unchanged. Approval of the ticket's test seams is already recorded; approval of
-these Command definitions is separate.
-
-## Proposed interface
+## Interface and authority
 
 | Command | Inputs | Successful result |
 | --- | --- | --- |
-| `exchange.start` | `connection`, `profile: jira-epic`, `issue` | Connection, loopback marker, document identity, actual destination-held sequence |
-| `document.get` | `connection`, `document` | Connection, loopback marker, document identity, actual stored sequence, Workdown bytes |
+| `exchange.start` | `connection`, `profile: jira-epic`, `issue` | Connection, loopback marker, document identity, destination-held sequence |
+| `document.get` | `connection`, `document` | Connection, loopback marker, document identity, stored sequence, Workdown |
 
-- Start requires current source Project Admin authority and caller-scoped export
-  checks. Read requires an authenticated destination-site reader, not source
-  access or Project Admin authority. Neither accepts caller-supplied installation
-  identity, an endpoint, or a destination Jira target.
-- Ticket 20 recognizes only `development-loopback`, disabled outside
-  development. Results explicitly say `loopback: true`. The general boolean
-  leaves room for accepted real Connections later; it does not enable them now.
-- Propose the stable Jira `source_id` ARI as document identity within a
-  Connection. There is no separate Exchange ID. Keys may change without
-  changing identity. Internal storage and TWG key encoding remains an
-  implementation design, not a raw concatenation of untrusted keys.
-- Start is repeat-safe per Connection and Subject. Each call attempts immediate
-  generation and delivery; changed bytes allocate a new positive safe-integer
-  sequence, unchanged bytes reuse it. Gaps are allowed. Retries of a candidate
-  retain its bytes and sequence. Concurrent allocation needs atomic storage
-  evidence, not only local fakes.
-- Start succeeds after durable destination acceptance (including an existing
-  same or newer sequence), not after TWG ingestion. Read returns latest-only
-  storage; it may be newer than the start acknowledgment. Neither response
-  claims a Publication or Search visibility.
-- Generation failure retains previous successful content and creates no
-  candidate. A delivery/storage error is not a rollback guarantee; a candidate
-  or destination document may already exist. No automatic retry promise or
-  durable retry queue is introduced before ticket 26.
+Both authenticate an active Atlassian account against the installation's Jira
+site. Start additionally checks current `ADMINISTER_PROJECTS` in the source
+issue context at the business boundary, using `issueId` for numeric IDs and
+`issueKey` otherwise, then performs the existing caller-scoped export checks.
+Reads do not query source Jira or require Project Admin authority. Per ADR 0001,
+content is unrestricted within the authenticated destination boundary, not public.
+The existing discovery/export transport retains its Site Admin admission policy.
+No caller-supplied tenant identity, endpoint, or destination Jira target is used.
 
-## Expected failures
+The only recognized Connection is `development-loopback`. Trusted
+`getAppContext().environmentType` must be `DEVELOPMENT`; missing runtime context,
+staging, and production fail closed. Every successful result marks loopback.
+Real peer Connections, revocation, Publication, TWG, and notifications are not
+implemented by this slice. Standard audit metadata is retained for both Commands;
+trust-changing Commands remain separate critical-audit work under ADR 0003.
 
-Existing export errors `-32002` through `-32009` also apply to start, along with
-standard invalid-parameter and forbidden errors. New proposed codes:
+## Identity, allocation, and receipt
 
-| Code | Message | Meaning |
-| --- | --- | --- |
-| `-32010` | Connection unavailable | Unknown, wrong direction, inactive, revoked, or development loopback disabled; no state details |
-| `-32011` | Delivery unconfirmed | Delivery acknowledgment absent or unusable; acceptance may already have happened |
-| `-32012` | Storage unavailable | Persistence/read/atomic allocation unavailable or outcome uncertain; not a missing-record response |
-| `-32013` | Document unavailable | No current retained document in the accessible active incoming Connection |
+- Document identity is the stable Jira source ARI, scoped by Connection and
+  installation. Source and destination roles use separate retained records.
+  Their internal keys are SHA-256 hashes of JSON-encoded identity tuples, not
+  raw caller strings or mutable issue keys. No separate Exchange ID is added.
+- The source retains one current candidate. Exact byte equality reuses its
+  positive safe-integer sequence; changed bytes advance it by one through a
+  conditional transaction. Three conflicting attempts fail without a success
+  claim; sequence exhaustion fails without wrapping.
+- An internal receipt seam accepts a trusted Connection/installation binding,
+  never a public unauthenticated peer RPC. Loopback invokes this seam only after
+  caller authentication, Project Admin checking, and successful generation.
+  Logical peers can use isolated stores in tests. It is not real cross-site
+  authentication or delivery evidence.
+- The destination independently retains latest-only content. A stale receipt
+  acknowledges the newer retained sequence. Identical duplicates are safe;
+  same-sequence/different-byte candidates are rejected. Conditional updates retry
+  up to three times to prevent a stale writer replacing newer content.
+- Durable source candidates survive uncertain delivery. A repeat start with
+  unchanged Jira content reuses the bytes and sequence. Source edits may create
+  a newer candidate; there is no historical replay or automatic queue yet.
+- Start acknowledges durable destination acceptance, not Publication or Search
+  visibility. A generation failure creates no new candidate and preserves the
+  previous document. Storage/receipt failures are sanitized and never imply
+  rollback or missing data. Reads validate identity, sequence, size and Workdown.
 
-Errors contain only stable code/message, no restricted diagnostics or partial
-content. Authentication failures remain the transport's responsibility; business
-permission failures are `Forbidden`. Authorization must precede disclosure of
-Connection/document state. Storage corruption and unexpected exceptions remain
-sanitized internal errors, not fabricated successful or missing results.
+## Forge persistence and contract tooling
 
-No new retry metadata is proposed: delivery-unconfirmed requires checking current
-state or safely repeating start, not assuming failure meant no write. Storage
-unavailability may be transient but may also have an uncertain write outcome.
-The existing export retry classifications remain unchanged.
+`storage:app` and custom entity `exchange-document` are newly declared.
+A single conditional Custom Entity Store transaction writes one version/identity
+record and four base64-encoded 64 KiB byte chunks. Each object stays below the
+240 KiB Forge object bound even at the 256 KiB UTF-8 export limit. Empty chunks
+use the entity's `any` payload. UTF-8 is decoded only after byte concatenation.
+Readers fetch the version before and after chunks and check all chunk versions;
+concurrent replacement retries, never returns mixed content. No history, lock,
+TTL, external service, or extra index is introduced. Entity declaration lifecycle
+restrictions and upgrade approval must be reviewed before deployment.
 
-## Binding and implementation obligations
+The installed RPC generator cannot preserve the approved integer schema/bounds,
+and its discovery projection drops numeric bounds. App-local
+`scripts/command-contract.mjs` generates types, Ajv standalone input/output
+validators, and policy from the one active contract. It preserves HandlerMap and
+Caller interfaces and fails unsupported type/policy declarations. Authenticated
+successful discovery restores the public application contract with method policy
+and examples removed, retaining numeric constraints. No external dependency was
+modified. Existing `workdown.export` remains unchanged.
 
-Intent → caller-facing Commands → reviewed `x-forge-ahead` metadata → existing
-webtrigger/dispatcher → business authorization, generation, delivery and storage.
+## Verification — 2026-11-19
 
-- `exchange.start`: `web: true`, `execution: asUser`, `audit: standard`.
-  This shares curated content under existing trust, rather than changing trust.
-  ADR 0003 marks invite/import/accept/revoke critical; this draft does not silently
-  add a durable critical-audit gate for start. Confirm this classification.
-- `document.get`: `web: true`, `execution: asApp`, `audit: standard` for app-owned
-  destination storage. `asApp` grants no caller permission and never bypasses
-  destination membership or lifecycle checks.
-- The existing web adapter requires Jira Site Admin authority for every request.
-  Ticket 20 must support Project Admin starts and authenticated destination reads
-  without weakening `workdown.export`'s existing policy. Approval of these
-  contracts approves the intended audience, not an authentication bypass.
-- No peer-receipt Command is declared here. Loopback needs an authenticated
-  delivery/receipt seam with trusted installation context, never a test-only
-  unauthenticated public method. Real peer protocol remains ADR 0003 work.
-- Handwritten handlers, runtime error catalog entries, execution selection,
-  input/output validators and Workdown/identity consistency checks remain to be
-  implemented after approval. String length is not the Workdown UTF-8 byte limit.
-- Sequence assignment, byte comparison and persistence ordering need an explicit
-  atomic design before implementation. Store sequence and bytes consistently;
-  reject stale deliveries and conflicting same-sequence/different-byte inputs.
-  Fence local reads/acceptance against revocation. Do not infer concurrency
-  correctness from a JSON Schema or from TWG index ordering.
+- Red/green observed for contract activation, start/read walking slice, changed
+  sequence allocation, corrupted retained content, non-admin authenticated reads,
+  and missing delivery acceptance.
+- **207 local tests / 8 files pass**, including separate logical peer stores,
+  stale/conflicting receipt rejection, uncertain delivery, concurrent identical
+  changes, storage adapter chunk bounds at full UTF-8 size, dispatcher validation,
+  authentication, production gating, generation failure, and tenant isolation.
+- OpenRPC validation, all examples, and negative numeric-bound checks pass.
+  Typecheck/build, generated freshness, formatting/static checks, and size check
+  pass; bundle is **19.94 kB brotlied / 32 kB limit**.
+- `npm run check` was run. Its only remaining failure is `forge lint`'s
+  `MAJOR_VERSION_RULE` approval gate for the added storage scope: **0 errors,
+  0 warnings, 1 approval required**. No approval was auto-accepted.
+- Existing-site deployed tests for authenticated start/read, repeat/concurrent
+  start and retained Workdown are added to the shared scenario harness, but were
+  **not run**. They write app storage and need explicit execution approval.
+  Deployed non-admin Project Admin/read evidence and changed-content sequence
+  races still need controlled fixtures and platform verification.
+- Forge transaction behavior, first conditional creation, storage consistency,
+  and actual concurrency are **not cloud verified**. SDK-backed fakes establish
+  adapter intent only. No actual inter-installation delivery was exercised.
+- Production dependency audit reports **5 moderate advisories**, no high or
+  critical advisories. Dependency remediation is not silently mixed into this
+  feature. Review before release.
 
-## Tooling gap and approval boundary
-
-The installed `@forge-ahead/rpc` generator rejects schema-level `description`
-annotations and numeric bounds; its documented profile also excludes integer
-schemas. The draft deliberately preserves numeric
-`updateSequenceNumber`, rather than silently changing it to a string to fit the
-generator. A reviewed generator enhancement or an explicitly approved alternative
-validation/type-generation approach is required before activation.
-
-This file and its OpenRPC companion are review artifacts, not another active
-contract source. On approval, merge the methods/components into `src/openrpc.json`
-and remove the draft JSON (retain only useful durable decision documentation).
-Do not regenerate active artifacts, change runtime exposure, deploy, or install
-merely to validate this proposal. No scope, egress, or manifest changes are made.
-
-Approval requested for the interface, stable identity encoding, repeat/uncertain
-write semantics, audience, error codes, and audit classification above. The
-integer generator gap remains a separate implementation blocker, not permission
-to modify an external dependency.
+No deployment, installation, upgrade, or live-site write was performed. Ticket
+20 is locally implemented, not closed: scope/upgrade approval and single-site
+platform evidence remain explicit gates. No second installation is required for
+that verification; real peer operation is not enabled by local tests.

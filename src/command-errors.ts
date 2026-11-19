@@ -25,4 +25,8 @@ export const commandErrors = {
   "children-unreadable": { title: "Children unreadable", code: -32007 },
   "document-too-large": { title: "Document too large", code: -32008 },
   "too-many-children": { title: "Too many children", code: -32009 },
+  "connection-unavailable": { title: "Connection unavailable", code: -32010 },
+  "delivery-unconfirmed": { title: "Delivery unconfirmed", code: -32011 },
+  "storage-unavailable": { title: "Storage unavailable", code: -32012 },
+  "document-unavailable": { title: "Document unavailable", code: -32013 },
 } as const satisfies Record<string, CatalogProblemDefinition>;

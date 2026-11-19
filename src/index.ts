@@ -8,8 +8,8 @@ import {
   createWebtrigger,
   type WebtriggerResponse,
 } from "@forge-ahead/rpc/webtrigger";
-import { authenticate, installation } from "./jira";
-import { options } from "./rpc";
+import { authenticate, authenticateAdmin, installation } from "./jira";
+import { completeDiscovery, options } from "./rpc";
 
 const logger = createForgeLogger({ name: "workdown", pretty: false });
 const errorPolicy = defineLogObjectSummaryPolicy({
@@ -17,12 +17,36 @@ const errorPolicy = defineLogObjectSummaryPolicy({
   fields: {},
 });
 
-const handle = createWebtrigger({
+const authenticatedHandle = createWebtrigger({
   ...options,
   installation,
   authenticate,
   context: (installation, principal) => ({ installation, principal }),
 });
+const adminHandle = createWebtrigger({
+  ...options,
+  installation,
+  authenticate: authenticateAdmin,
+  context: (installation, principal) => ({ installation, principal }),
+});
+const handle: typeof adminHandle = async (request, context) => {
+  let method: unknown;
+  try {
+    method = JSON.parse(request.body ?? "").method;
+  } catch {
+    /* Malformed requests retain the existing admin admission policy. */
+  }
+  const response = await (method === "exchange.start" ||
+    method === "document.get"
+    ? authenticatedHandle
+    : adminHandle)(request, context);
+  if (method === "rpc.discover" && response.statusCode === 200)
+    return {
+      ...response,
+      body: JSON.stringify(completeDiscovery(JSON.parse(response.body))),
+    };
+  return response;
+};
 
 function summarizeResponse(
   response: WebtriggerResponse,

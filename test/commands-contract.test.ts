@@ -1,9 +1,13 @@
 import { readFileSync } from "node:fs";
 import { err } from "@forge-ahead/errors";
 import { createDispatcher } from "@forge-ahead/rpc";
-import { generateContract } from "@forge-ahead/rpc/generator";
 import { describe, expect, it } from "vitest";
+import { generateContract } from "../scripts/command-contract.mjs";
 import { commandErrors } from "../src/command-errors";
+import {
+  inputValidators,
+  outputValidators,
+} from "../src/generated/validators.js";
 import commands from "../src/openrpc.json";
 import { validateWorkdown } from "../src/workdown-validation";
 import { validateOpenRpc } from "./openrpc";
@@ -15,6 +19,36 @@ const fixture = (name: string) =>
   );
 
 describe("application Command contract", () => {
+  it("validates every approved example and rejects non-safe-integer output sequences", () => {
+    for (const method of commands.methods) {
+      const name = method.name as keyof typeof inputValidators;
+      for (const example of method.examples) {
+        expect(
+          inputValidators[name](
+            Object.fromEntries(
+              example.params.map((param) => [param.name, param.value]),
+            ),
+          ),
+        ).toBe(true);
+        expect(outputValidators[name](example.result.value)).toBe(true);
+      }
+    }
+    const example = commands.methods[1]?.examples[0]?.result.value;
+    for (const updateSequenceNumber of [
+      0,
+      -1,
+      1.5,
+      9007199254740992,
+      "1",
+      null,
+    ])
+      expect(
+        outputValidators["exchange.start"]({
+          ...(example as object),
+          updateSequenceNumber,
+        }),
+      ).toBe(false);
+  });
   it("is a valid OpenRPC document", () => {
     expect(
       validateOpenRpc(commands),
@@ -32,6 +66,8 @@ describe("application Command contract", () => {
   it("does not declare the reserved discovery method", () => {
     expect(commands.methods.map((method) => method.name)).toEqual([
       "workdown.export",
+      "exchange.start",
+      "document.get",
     ]);
   });
 

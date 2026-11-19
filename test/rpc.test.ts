@@ -101,6 +101,8 @@ describe("discovery dispatcher", () => {
     });
     expect(document.methods.map((method) => method.name)).toEqual([
       "workdown.export",
+      "exchange.start",
+      "document.get",
     ]);
   });
 });
