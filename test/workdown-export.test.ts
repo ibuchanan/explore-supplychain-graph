@@ -776,7 +776,7 @@ describe("workdown.export", () => {
     ).toBe(false);
     expect(
       validateWorkdown(
-        document(metadata, body.slice(0, body.indexOf("\n## Children")) + "\n"),
+        document(metadata, `${body.slice(0, body.indexOf("\n## Children"))}\n`),
       ),
     ).toBe(false);
     expect(
@@ -788,8 +788,7 @@ describe("workdown.export", () => {
       sources: [metadata.sources[0]],
       parent: metadata.children[0],
     };
-    const noTable =
-      body.slice(0, body.indexOf("\n## Children")).trimEnd() + "\n";
+    const noTable = `${body.slice(0, body.indexOf("\n## Children")).trimEnd()}\n`;
     delete standalone.children;
     expect(validateWorkdown(document(standalone, noTable))).toBe(true);
     expect(validateWorkdown(document(standalone))).toBe(false);

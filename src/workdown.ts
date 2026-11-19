@@ -148,8 +148,7 @@ export const exportWorkdown: HandlerMap<
     return err("field-unreadable");
   // Only classic projects have observed secured-item detection; next-gen remains gated.
   const project = issue.fields["project"] as { simplified?: unknown } | null;
-  if (!project || project.simplified !== false)
-    return err("eligibility-undetermined");
+  if (project?.simplified !== false) return err("eligibility-undetermined");
   if (!validScalars(issue.fields)) return err("field-unreadable");
   const mapping = await resolveStartDate(
     context,
