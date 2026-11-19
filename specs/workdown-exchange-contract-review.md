@@ -276,3 +276,35 @@ credential securely before the write scenario can proceed.
 `npm run check` passes with the new opt-in test excluded from default local runs:
 **209 local tests / 8 files**, Forge lint, freshness/typecheck/build/static/format,
 and **19.95 kB / 32 kB** size check. No deployment or installation was performed.
+
+### Ticket 20 completion — 2026-11-19 15:55
+
+After the user corrected the Keeper value, the same authorized disposable-Epic
+scenario passed on development **4.2.0**: **1 deployed test passed**. No code,
+assertions, authentication rules or token scopes were changed for this retry.
+The earlier credential failure is historical; its exact cause was not diagnosed.
+
+- Created a fresh synthetic Epic in the approved test project. First start and
+  destination read confirmed sequence **1**, exercising first acceptance for a
+  newly created source identity.
+- Changed its description and independently read the changed Jira field. Two
+  concurrent starts agreed on the same identity and sequence **2**. Destination
+  read confirmed changed content at 2; a repeat start reused 2.
+- Restored the baseline description and independently read it back from Jira.
+  Two concurrent starts agreed on the same identity and sequence **3**.
+  Destination read confirmed restored content at 3; a repeat start reused 3.
+- The ignored local recovery record reports `restoration: verified` and
+  sequences `[1, 2, 3]`. The Epic remains available for inspection; it was not
+  deleted. Jira history and the advanced Forge sequence intentionally remain.
+- Recent sanitized development logs show successful HTTP 200 invocations for
+  the test, with no errors or document bodies in the retrieved window. No agent
+  deployment or installation was performed.
+
+Together with the earlier **4 passed / 2 deferred security skips** installed
+suite and local behavior/security tests, this satisfies ticket 20's explicit
+single-installation Forge-storage sequence gate. **Ticket 20 is complete** under
+the approved proportionate-verification policy. This test verifies concurrent
+allocation for a shared changed generation; it does not force a deterministic
+interleaving of different generations. Non-admin cloud credentials, the two
+skipped Epic-security scenarios, and actual cross-installation delivery remain
+unverified; real peer operation is not enabled or approved by this completion.
