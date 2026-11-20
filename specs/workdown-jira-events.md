@@ -111,6 +111,73 @@ No synthetic payload in local tests is claimed as a sanitized cloud fixture.
    contradiction of the approved profile. Actual remote-peer delivery remains
    unverified by this single-installation loopback scenario.
 
+## Installed read-only verification — 2026-11-20 08:49 local
+
+After the user reported deployment and authorized installed-app verification:
+
+- Forge installation list reports development Jira major **7 (Latest)**,
+  app version **7**, **Up-to-date**. This reports installation state, not a
+  source-commit fingerprint or proof of trigger execution.
+- SecretSpec-backed deployed suite, filtered to authenticated discovery and
+  export only: **3 passed / 3 skipped** in about 10 seconds. Discovery matches
+  the local approved contract; the company-managed known-value export passes;
+  the team-managed scenario returns its independently expected eligibility
+  denial. Skips are two previously deferred secured/unreadable Epic cases and
+  the deliberately excluded Exchange-start case (which writes/ingests).
+- Sanitized development log read: 1351 bytes, four recognized RPC completion
+  records: unauthorized request (401), two successes (200), and expected
+  eligibility denial (-32006 over HTTP 200). No runtime-error markers or Jira
+  event-intake records were observed in this bounded read. The read ran
+  concurrently with the tests; no claim of exhaustive invocation correlation.
+- No Exchange start, storage write, ingestion request, Jira edit/create/delete,
+  deployment, installation, or upgrade was performed. Event subscriptions,
+  offline-principal generation, child routing, and resulting TWG Publication
+  remain unverified on the installed platform.
+
+Next verification needs explicit approval for Exchange registration/ingestion
+and an operator-approved reversible Jira fixture mutation, followed by status
+and document reads without another manual start masking the event outcome.
+
+## Approved installed Epic-summary event verification — 2026-11-20 08:55 local
+
+The user explicitly authorized starting the configured test Exchange, a reversible
+Epic edit, observing automatic Publication, and restoring the original content.
+The SecretSpec-backed targeted check **passed in 35.5 seconds** on the existing
+development installation:
+
+| Stage | Retained sequence | Published sequence | Independent content check |
+| --- | --- | --- | --- |
+| Initial authenticated Exchange start | 1 | 1 | Baseline established |
+| Temporary Epic summary edit | 2 | 2 | Retained title matches the temporary source summary |
+| Original Epic summary restored | 3 | 3 | Source reread equals original; retained title matches original |
+
+Only the initial baseline called `exchange.start`. Neither changed nor restored
+Publication was induced by a later manual start. Subsequent calls were reads
+of `publication.status` and `document.get`, bounded to 65 seconds per stage;
+no scheduled polling or reconciliation was added to the app. The test changed
+only the configured Epic's summary and verified restoration in a `finally`
+block with a concurrent-edit guard. No child was created, edited, deleted, or
+reparented. Jira edit history, sequence 3, and the credential-free Exchange
+registration remain as expected verification effects.
+
+A follow-up sanitized development log read returned 6526 bytes, including two
+`workdown.jira-change.completed` records, each `attempted: 1, failed: 0`, plus
+two recorded acknowledgment-storage and two recorded notification-storage
+outcomes. No runtime-error markers were found in that bounded read. Raw event
+payloads, source content, account IDs, URLs, and credentials were not printed
+or retained as evidence. Temporary test and recovery files were removed after
+source restoration was verified.
+
+This establishes installed Jira issue-update intake for this Epic-summary
+change, generation under the retained principal through the configured offline
+read adapter, and final acknowledged TWG Publication for both edit and
+restoration. It is stronger than peer-adapter handoff. It does not establish
+Search indexing latency, external notification consumption, raw event payload
+shape, every included field, child events, reparenting/deletion, permission or
+principal changes, non-contributor impersonation, or actual remote-peer delivery.
+Ticket 22 remains open for those named coverage/decision gates; automatic
+freshness is not generally proven by this one successful scenario.
+
 ## Official references consulted 2026-11-20
 
 - [Jira product event schemas and required scope](https://developer.atlassian.com/platform/forge/events-reference/jira/)
