@@ -1,5 +1,16 @@
 # Ticket 21: Publication implementation and verification
 
+<!-- cspell:words openrpc reingesting workdown Workdown Frontmatter -->
+<!-- cspell:words readback devb stargate webtrigger Rovo -->
+
+## Current evidence
+
+As of 2026-11-19, deployed Publication acknowledgment and manual Rovo Search
+discovery pass on the development installation. See
+[the latest results](#publication-and-rovo-search-verified--2026-11-19) and the
+[manual Search guide](../docs/how-to/search-workdown.md). Earlier diagnostic
+sections below are historical, not current blockers.
+
 ## Decisions confirmed 2026-11-19
 
 The user clarified that `publication.published` is a JSON-RPC 2.0 notification,
@@ -79,8 +90,9 @@ Existing-site deployed status assertions were added but not run.
 The required full check includes tests, typecheck/build, contract freshness,
 format/static checks, Forge lint and bundle size. Its final result is recorded
 on the scratch ticket: **223 tests / 10 files pass**, full check passes, and
-bundle size is **23.77 kB / 32 kB**. Runtime dependency audit reports six moderate and no
-high/critical advisories; no unrelated dependency upgrades were attempted.
+bundle size is **23.77 kB / 32 kB**. Runtime dependency audit reports six
+moderate and no high/critical advisories; no unrelated dependency upgrades
+were attempted.
 
 ## Development-site follow-up — 2026-11-19
 
@@ -204,7 +216,59 @@ change, or agent ingestion retry was performed. Use this correlation evidence
 for platform investigation, or explicitly approve a controlled invocation-context
 comparison. Ticket remains open.
 
-## Outstanding platform gates — ticket remains open
+## Publication and Rovo Search verified — 2026-11-19
+
+This update supersedes the earlier unresolved HTTP 401 status. The missing
+`read:object:jira` and `delete:object:jira` scopes were added alongside the
+existing write scope, following the official connector module reference.
+The developer deployed and upgraded the development installation. The next
+observed graph request returned HTTP 202 with SDK success, one accepted object,
+and no rejections. The original backend authentication reason was not recovered.
+
+Runtime diagnostics then established an acceptance-shape mismatch: the service
+returned the matching document ID in `accepted.entityId.entityId`; the matcher
+expected `accepted.entityId.id`. Commit `c65ea47` supports the observed field
+with the documented field as fallback, preserving exact type/identity and
+zero-rejection requirements. Temporary identity diagnostics were removed.
+Local validation passed 228 tests and the full repository checks.
+
+After the developer redeployed, `npm run test:deployed:publication` passed at
+18:57 local time: retained sequence 1 and published sequence 1. This proves
+app-recorded acknowledgment for the current configured Epic, not indexing.
+
+The developer subsequently verified the Workdown in the Rovo Search UI:
+
+- With **Type: Document**, each of `lost in a maze`, `reporting system`, and
+  `2025-08-16` returned exactly the one Workdown document.
+- Searching words unique to the included child's title also returned it;
+  the exact query words were not recorded.
+- Opening the Workdown result navigated to the source Epic.
+- Source and child issue-key queries were intercepted as exact issue matches,
+  so they were unsuitable for the Document-filter check, not app failures.
+
+The description phrases support body-text discovery. The date is a configured
+Start date value, but its absence elsewhere was not checked: structured date
+metadata and exact Frontmatter retention are not established. Child-title
+search does not establish child-description indexing. Prior ingestion attempts
+prevent a clean indexing-latency measurement. These are user-observed UI
+results, not agent browser automation or a public Search API test.
+
+The [Search guide](../docs/how-to/search-workdown.md) captures the repeatable
+procedure, observations, and evidence boundaries. Source navigation does not
+verify a separate Workdown viewer or its HTML/link safety. Rovo Chat behavior,
+all-user visibility, freshness, deletion, and cross-site delivery remain
+unverified.
+
+## Remaining characterization and follow-up
+
+Deployment/activation, matching ingestion acknowledgment, and basic Epic
+Search discovery are now verified. Earlier lists below describe the original
+broader verification scope; do not treat those completed steps as blockers.
+Exact representation readback, documented-limit review, viewer work, deletion,
+and broader Search characterization still need evidence or an explicit scope
+decision before full ticket closure.
+
+## Original platform verification scope
 
 1. Approve deployment/installation after reviewing the new scope and connector;
    explicitly activate the connector on the approved development site.

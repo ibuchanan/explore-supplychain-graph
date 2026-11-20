@@ -20,9 +20,10 @@ It is not a complete cross-site supply-chain integration.
 - The **Workdown** connector projects retained content as an
   `atlassian:document`. Publication requires a matching accepted-object response;
   retaining a document is not the same as publishing it.
-- **Cloud blocker, 2026-11-19:** development 5.3.0 retains documents, but graph
-  ingestion returns HTTP 401. End-to-end Publication and Rovo Search visibility
-  remain unverified for this app. See the
+- **Verified on the development installation, 2026-11-19:** the deployed
+  Publication test passes, and manual Rovo Search checks find the Workdown
+  using parent-description text, a Start date value, and included child-title
+  words. See [what Search can do](docs/how-to/search-workdown.md) and the
   [verification record](specs/workdown-publication-verification.md).
 - There is no implemented cross-site delivery or scheduled refresh. The current
   document link points to the source Jira issue, not a destination-local viewer.
@@ -80,7 +81,8 @@ uses Bun, SecretSpec, and Fence Rider alongside the Forge CLI.
    The test starts or repeats the configured loopback Exchange. It does not
    edit Jira issues, but may publish their exported content to Teamwork Graph.
    Matching retained/published sequences prove app-recorded acknowledgment,
-   not Search visibility. **The current known 401 makes this check fail.**
+   not Search visibility. Then follow the
+   [manual Rovo Search check](docs/how-to/search-workdown.md).
 
 Do not disconnect/reconnect as a harmless reset: Atlassian deletes data ingested
 through the disconnected connector.

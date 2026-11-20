@@ -6,12 +6,12 @@ Use this guide to enable this app's **Workdown** Teamwork Graph connector on
 an already installed Jira development site. This is an admin setup procedure,
 not a claim that document ingestion currently succeeds.
 
-**Current state, 2026-11-19:** development version 5.3.0 can retain a loopback
-document and find its saved connector binding, but graph ingestion returns
-HTTP 401. Creating a connection or seeing **Connected** does not prove
-Publication or Rovo Search visibility. Follow the
-[recorded investigation](../../specs/workdown-publication-verification.md)
-for the latest evidence and service trace.
+**Current state, 2026-11-19:** the deployed Publication test passes, and the
+developer has found the Workdown through manual Rovo Search checks. Creating a
+connection or seeing **Connected** alone still proves neither result. Follow
+the [manual Search guide](search-workdown.md) after publication and the
+[verification record](../../specs/workdown-publication-verification.md)
+for the evidence and remaining limitations.
 
 ## Before you start
 
@@ -23,7 +23,8 @@ for the latest evidence and service trace.
   environments. The development site used in the recorded investigation is
   `one-atlas-devb.atlassian.net`; choose your own authorized target deliberately.
 - Have the installer confirm the installation includes the current manifest
-  permissions: `storage:app` and `write:object:jira`. Deployment alone does not
+  permissions: `storage:app`, `write:object:jira`, `read:object:jira`, and
+  `delete:object:jira`. Deployment alone does not
   upgrade an existing installation's permissions. If setup is still needed,
   follow [local Forge setup][local-setup].
 - Use only content approved for disclosure to destination workspace users.
@@ -61,7 +62,8 @@ not ask the admin for source-system credentials.
 The navigation above follows the
 [official connector tutorial](https://developer.atlassian.com/platform/teamwork-graph/build-a-teamwork-graph-connector/).
 UI labels may vary. The procedure has not been browser-verified by the agent;
-the existing setup and failed ingestion were reported by the developer.
+the existing setup and subsequent Search observations were reported by the
+developer.
 
 ## What this action does
 
@@ -104,10 +106,10 @@ Do not create a second connection to work around an ingestion error.
    acknowledgment should you independently check Rovo Search visibility.
 
 The UI setup does not configure deployed-test credentials or issue scenarios;
-those remain in the development guide. As of 5.3.0, the strict check fails with
-HTTP 401. Record the graph-service trace and invocation time for investigation;
-do not change source ACLs, weaken acknowledgment checks, or add scopes merely
-to make the test green.
+those remain in the development guide. The earlier HTTP 401 and accepted-ID
+shape mismatch are resolved in the recorded development check. If ingestion
+fails again, record the graph-service trace and invocation time; do not change
+source ACLs, weaken acknowledgment checks, or add speculative scopes.
 
 ## Disconnect carefully
 
