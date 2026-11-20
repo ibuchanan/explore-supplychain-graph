@@ -22,8 +22,9 @@ The local implementation removes parent lookup and retained-child routing and
 subscribes only to issue updates. Tests cover ignored child create/update/delete
 and reparenting payloads, exact Subject matching, retained-principal delegation,
 and regeneration of child snapshot content on a later Subject update. No scope,
-egress, Command, or document-format change is needed. **This policy change has
-not been deployed or cloud-verified.** The earlier installed successes/failure
+egress, Command, or document-format change is needed. **The user-deployed policy
+was cloud-verified on 2026-11-20 at 11:55–11:57; see the installed check below.**
+The earlier installed successes/failure
 below describe the superseded child-triggering implementation and are preserved
 as historical evidence, not current acceptance requirements. MSD-20 remains an
 adopted fixture; no cleanup is requested.
@@ -33,6 +34,59 @@ files**, type checking, Forge lint, build/format/contract checks, and a
 **26.49 kB / 32 kB** bundle. README, admin/Search guides, and this evidence page
 pass Markdown lint. Broader glossary/spec lint still reports existing long
 lines; unrelated formatting and user edits were preserved.
+
+## Installed Epic-only policy verification — 2026-11-20 11:55–11:57 local
+
+After the user reported deployment and authorized installed verification, the
+SecretSpec-backed targeted check passed in **96.4 seconds**. Installation list
+reports development Jira **7 (Latest), Up-to-date**; this is a major/version
+status, not a source-commit fingerprint. Observed behavior establishes the
+narrowed routing on the tested installation.
+
+| Action | Retained / published | Independent observation |
+| --- | --- | --- |
+| Initial authorized Exchange start | 6 / 6 | Snapshot includes adopted fixtures MSD-5 and MSD-20 |
+| Edit MSD-5 summary only | 6 / 6 | Seven status reads over at least 35 seconds; retained bytes unchanged |
+| Edit MSD-1 summary | 7 / 7 | Automatic Publication; Epic title and changed child title both match |
+| Restore MSD-5 summary only | 7 / 7 | Three status reads over at least 15 seconds; retained bytes unchanged |
+| Restore MSD-1 summary | 8 / 8 | Automatic Publication; original Epic and child titles both match |
+
+Only the baseline called `exchange.start`; every later observation was a read.
+The child snapshot was intentionally stale after each child-only change and
+refreshed on the next Epic update, matching the approved policy. Both source
+summaries were independently read back after restoration with concurrent-edit
+guards; MSD-20 was not modified or deleted. No creation, deletion, reparenting,
+labels, security, permissions, deployment, installation, or upgrade was performed
+by the agent during this check. Expected residual effects are Jira edit history,
+registry state, and the final acknowledged sequence 8.
+
+A bounded sanitized log read returned **11742 bytes**, four intake completions
+(two `attempted: 0, failed: 0`; two `attempted: 1, failed: 0`), and three pairs
+of acknowledgment-storage/notification-storage recorded outcomes, consistent
+with baseline and two Epic Publications. No runtime-error markers were found.
+The log records lack event identities; their counts corroborate the controlled
+scenario, not arbitrary payload shape or exact per-record attribution. No raw
+Jira events, source summaries, account IDs, private endpoints, or credentials
+were printed or retained in evidence. Temporary test/recovery files were removed
+after verified restoration.
+
+### Remaining evidence limits
+
+- Negative child observations are bounded, not proof against arbitrarily delayed
+  events. Local identity-routing tests provide the deterministic complement.
+- Installed unchanged-content **Epic-event** deduplication is still unverified.
+  Labels are included in Workdown, and `updated_at` plus source `last_modified`
+  include Jira's updated timestamp. Even an excluded-field edit can therefore
+  change canonical bytes. No label mutation or misleading no-op update test was
+  performed. The ignored-child checks are not claimed as Epic deduplication.
+  Local duplicate-event/canonical-byte tests remain passing.
+- Sanitized raw Epic-event shape fixtures are not captured; counts-only logging
+  deliberately does not expose event payloads. No new diagnostic deployment.
+- Permission-loss, principal changes, and non-contributor impersonation remain
+  unverified in the cloud; local fail-closed tests and documented restrictions
+  are not substitutes. Event completeness, missed-event staleness, source-Epic
+  deletion/withdrawal, indexing latency, and actual remote delivery retain the
+  previously documented limitations.
 
 ## Historical local implementation (2026-11-20, before Epic-only decision)
 
