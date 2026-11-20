@@ -70,7 +70,14 @@ Jira events, source summaries, account IDs, private endpoints, or credentials
 were printed or retained in evidence. Temporary test/recovery files were removed
 after verified restoration.
 
-### Remaining evidence limits
+### Completion accepted with remaining evidence limits — 2026-11-20 12:04
+
+The user explicitly accepted the limits below and approved completion of the
+Epic-only republish work. The installed Epic/child snapshot behavior and 244
+passing local tests are sufficient for this accepted scope. These limits are
+not newly verified, and acceptance does not authorize security/permission
+mutations, enable real peer traffic, or broaden operational guarantees.
+Implementation: `94bdb26`; installed verification evidence: `31fab09`.
 
 - Negative child observations are bounded, not proof against arbitrarily delayed
   events. Local identity-routing tests provide the deterministic complement.
