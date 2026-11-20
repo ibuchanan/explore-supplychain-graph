@@ -25,6 +25,34 @@ The following decisions have been approved by Ian Buchanan and adopted for imple
 
 These decisions are implementation-ready; verification gates below remain open for integration testing (export tickets 03–08).
 
+## Targeted project field lookup — 2026-11-20
+
+The user approved replacing the second full catalog scan with an exact-ID,
+project-filtered lookup. Initial site-wide stable-ID discovery and uniqueness
+checks remain unchanged. The project query now combines `id=<resolved local ID>`,
+`projectIds=<issue project ID>`, and `expand=stableId`. The current field-search
+API contract documents these parameters together. Complete-response validation,
+compatible schema, matching semantic identity, and caller credentials remain
+required; no caching, name matching, or extra permissions are introduced.
+
+The public authenticated `workdown.export` regression was observed failing before
+the query change and passing afterwards: the project HTTP boundary accepts only
+the resolved ID and returns the independently expected date with one request.
+Existing pagination, absence, ambiguity, schema, request-failure, and cross-ID
+fixture coverage remains. After the user reported deployment and authorized an
+installed-app check, the SecretSpec-backed discovery/export selection passed on
+2026-11-20: three tests passed in 10.87 seconds. Discovery authentication and
+contract equality passed; both configured exports passed exact populated-date or
+explicit omission expectations, document validation, child/description checks,
+and the disclosure allowlist. Project-type labels are operator supplied.
+This verifies the installed export path after deployment; live HTTP query/count
+telemetry was not captured. Exchange-start/ingestion tests were excluded, and
+unavailable negative Epic fixtures remain skipped. No credentials, URLs, issue
+keys, dates, or documents were printed.
+Create/edit metadata is not substituted: neither documents `stableId`, and their
+create/edit permission and screen/workflow rules differ from readable export data.
+This section supersedes earlier references to a second full project catalog scan.
+
 ## Jira metadata research findings
 
 Research status as of 2026-11-15: field and parent-relationship probing is
@@ -662,10 +690,16 @@ profile or explicitly approve the freshness limitation; do not silently add
 polling or promise reconciliation. Event delivery does not guarantee a
 transactionally consistent multi-issue Jira snapshot.
 
-Verify the accepted TWG content MIME type and whether it retains Frontmatter,
-then test both Search indexing and the local viewer with representative content.
-Do not assume `text/markdown` is supported or that YAML becomes indexed metadata.
-Use a destination-local read URL and preserve `resource` only as provenance.
+TWG accepted the full canonical Workdown submitted as `text/plain`, and the user
+verified Epic Workdown discovery through Rovo Search on 2026-11-19. On 2026-11-20
+the user accepted this ingestion evidence without further Search feature or exact
+Frontmatter-readback characterization. Do not infer Markdown rendering, structured
+YAML indexing, or byte-preserving TWG readback. See the
+[accepted ingestion scope](workdown-spec.md#ingestion-evidence-and-accepted-scope--2026-11-20).
+A destination-local viewer remains absent and is not ticket 21 work; the current
+Search URL points to the source Epic. Source-independent viewing is not established.
+When a viewer is added, use a destination-local read URL and preserve `resource`
+only as provenance, with the format specification's HTML and safe-link protections.
 
 ## Jira converter acceptance tests
 

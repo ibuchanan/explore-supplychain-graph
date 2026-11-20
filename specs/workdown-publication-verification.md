@@ -259,14 +259,35 @@ verify a separate Workdown viewer or its HTML/link safety. Rovo Chat behavior,
 all-user visibility, freshness, deletion, and cross-site delivery remain
 unverified.
 
-## Remaining characterization and follow-up
+## Accepted closure scope — 2026-11-20
 
-Deployment/activation, matching ingestion acknowledgment, and basic Epic
-Search discovery are now verified. Earlier lists below describe the original
-broader verification scope; do not treat those completed steps as blockers.
-Exact representation readback, documented-limit review, viewer work, deletion,
-and broader Search characterization still need evidence or an explicit scope
-decision before full ticket closure.
+Deployment/activation, matching ingestion acknowledgment, and Epic Workdown
+Search discovery are verified. The user accepts this as sufficient evidence of
+TWG ingestion. Exact TWG content/Frontmatter readback, additional Search token
+coverage, structured metadata indexing, and measured indexing latency are not
+closure gates; they remain unverified rather than newly proven. The app controls
+submission and acknowledgment handling, not Rovo Search feature behavior.
+
+No additional fixture framework, standalone export profile, or destination-local
+viewer is required for ticket 21. The current source-Epic URL remains provisional;
+source-independent viewing and viewer HTML/link safety are not established. Any
+future viewer must satisfy the format specification's security requirements.
+
+The user explicitly deferred deletion API characterization and platform
+connector / document mapping to ticket 28, alongside withdrawal. No deletion was
+performed or authorized by that deferral. Real peer delivery remains
+disabled/unverified.
+
+The Forge/TWG limits and quotas review is now documented in
+[Workdown platform boundaries](workdown-platform-boundaries.md). It keeps the
+current byte/child caps unchanged provisionally, distinguishes billable allowances
+from hard limits, and identifies the missing invocation-wide request/deadline
+budget and storage amplification. This is not a cloud capacity test or a runtime
+fix. On 2026-11-20 the user explicitly accepted the app-controlled budget gap
+as a non-blocking hardening follow-up and approved closing the ingestion slice.
+The gap remains unimplemented; operational capacity is not claimed. The original
+verification scope below is historical and superseded where it conflicts with
+this accepted scope; it does not add closure gates.
 
 ## Original platform verification scope
 

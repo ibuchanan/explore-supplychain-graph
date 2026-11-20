@@ -498,11 +498,15 @@ Rationale and official sources (consulted 2026-11-18):
   summaries are embedded in one document, not individual TWG objects: that
   batch limit does **not** impose an actual 100-child ingestion restriction.
 
-Both values are provisional. The TWG ingestion work must confirm or adjust them against
-actual deployed TWG ingestion and the chosen storage/delivery path before
-operational use. No such ingestion, storage, or worst-case cloud payload check
-has been performed for the export-limits work. Async events must carry references rather
-than assuming that a full document fits their separate event payload limits.
+Both values remain provisional for operational capacity. The
+[2026-11-20 platform boundary review](workdown-platform-boundaries.md) supports
+keeping them unchanged based on storage and invocation-envelope sizing. Normal
+deployed TWG ingestion is verified, but acceptance at the byte cap and worst-case
+cloud runtime are not. No numeric TWG text-size ceiling was found in the consulted
+references. The child cap does not bound metadata/child pagination or the total
+egress/time budget; that app-controlled risk is recorded separately in the review.
+Async events must carry references rather than assuming that a full document fits
+their separate event payload limits.
 
 Limit errors contain only their stable code/message and no document, source
 values, counts, or diagnostics. Other incomplete or invalid candidates also
@@ -513,17 +517,36 @@ retention of the previous successful document on failure belong to the Exchange 
 Source-specific test suites, fixtures, and acceptance gates are documented in
 companion profiles; see [Source profiles](#source-profiles).
 
-### Ingestion implementation evidence — 2026-11-19
+### Ingestion evidence and accepted scope — 2026-11-20
 
-The local destination adapter submits the full canonical Workdown, including
+The destination adapter submits the full canonical Workdown, including
 Frontmatter, as `atlassian:document` content with `mimeType: text/plain`.
-This is the documented candidate representation, not verified service acceptance
-or a claim of Markdown rendering or structured Frontmatter indexing. Publication
-status advances only after a matching accepted-object acknowledgment with no
-rejections; retained bytes remain readable when ingestion fails.
+Development-installation ingestion acknowledgment and Publication status were
+verified on 2026-11-19. Status advances only after a matching accepted-object
+acknowledgment with no rejections; retained bytes remain readable when ingestion
+fails. Local tests cover rejection, mismatched identity, and concurrent updates.
 
-The 256 KiB document and 100-child limits remain provisional. Local storage
-round-trip tests cover the byte bound; deployed TWG acceptance, Search timing,
-Frontmatter preservation, deletion, worst-case payloads, and local viewer safety
-are outstanding. See [Publication implementation and verification](workdown-publication-verification.md)
-for the permission review, official references, evidence, and remaining gates.
+The user found the Epic Workdown through Rovo Search with Type: Document,
+including searches for parent-body phrases, a configured Start date value, and
+included child-title words. On 2026-11-20 the user accepted acknowledgment and
+Search discovery as sufficient ingestion evidence. Additional Search feature
+characterization, exact downstream byte/Frontmatter readback, standalone coverage,
+and measured indexing latency are not ticket 21 closure gates. No Markdown
+rendering, structured Frontmatter indexing, indexing-time guarantee, or exact
+TWG byte retention is claimed.
+
+There is no destination-local viewer in this backend slice; the Search result
+currently links to the source Epic. This is a provisional navigation limitation,
+not proof of source-independent viewing or viewer HTML/link safety. A future
+viewer must still satisfy this specification's untrusted-content requirements;
+building it is not required to close ticket 21. Deletion API characterization
+and object mapping were explicitly transferred to ticket 28 on 2026-11-20;
+withdrawal is not implemented or verified by ticket 21.
+
+The 256 KiB document and 100-child limits remain unchanged and provisional for
+operational capacity after the
+[Forge/TWG boundary review](workdown-platform-boundaries.md). Local storage
+round-trip tests cover the byte bound;
+no new worst-case cloud payload test is implied. See
+[Publication implementation and verification](workdown-publication-verification.md)
+for the permission review, evidence boundaries, and limits findings.
