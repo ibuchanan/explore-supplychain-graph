@@ -60,12 +60,17 @@ async function call(
       const query = new URL(url).searchParams;
       expect(query.get("expand")).toBe("stableId");
       const startAt = Number(query.get("startAt"));
+      const fields = query.has("id")
+        ? catalog.filter(
+            (field) => (field as { id: string }).id === query.get("id"),
+          )
+        : catalog;
       return Response.json({
         startAt,
         maxResults: 1,
-        total: catalog.length,
-        isLast: startAt + 1 >= catalog.length,
-        values: catalog.slice(startAt, startAt + 1),
+        total: fields.length,
+        isLast: startAt + 1 >= fields.length,
+        values: fields.slice(startAt, startAt + 1),
       });
     }
     if (url.includes("/search/jql?"))
@@ -953,6 +958,38 @@ describe("workdown.export", () => {
     ]);
     expect(response.result).toBeTypeOf("string");
     expect(response.result).not.toContain("start_date:");
+  });
+  it("exports Start date using only its resolved ID in the project lookup", async () => {
+    let projectRequests = 0;
+    const response = await call(
+      { ...epic, fields: { ...epic.fields, [startField.id]: "2026-11-20" } },
+      undefined,
+      200,
+      [{ id: "unrelatedSystemField" }, startField],
+      cloudId,
+      (url) => {
+        if (!url.searchParams.has("projectIds")) return;
+        projectRequests++;
+        const query = url.searchParams;
+        if (
+          query.get("id") !== startField.id ||
+          query.get("projectIds") !== "10000" ||
+          query.get("expand") !== "stableId"
+        )
+          return Response.json({}, { status: 400 });
+        return Response.json({
+          startAt: 0,
+          total: 1,
+          isLast: true,
+          values: [startField],
+        });
+      },
+    );
+    expect(response.error).toBeUndefined();
+    expect(parse(response.result.split("---\n")[1]).start_date).toBe(
+      "2026-11-20",
+    );
+    expect(projectRequests).toBe(1);
   });
   it("omits a field proven inapplicable by the complete project-filtered catalog", async () => {
     const response = await call(

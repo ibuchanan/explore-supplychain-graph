@@ -12,7 +12,7 @@ type Resolution = {
 
 async function catalog(
   context: CommandContext,
-  project?: string,
+  project?: { id: string; fieldId: string },
 ): Promise<Field[] | undefined> {
   const fields: Field[] = [];
   let total: number | undefined;
@@ -21,7 +21,7 @@ async function catalog(
     const response = await jiraGet(
       context.installation,
       context.principal.authorization,
-      `field/search?expand=stableId&startAt=${fields.length}&maxResults=100${project ? `&projectIds=${encodeURIComponent(project)}` : ""}`,
+      `field/search?expand=stableId&startAt=${fields.length}&maxResults=100${project ? `&projectIds=${encodeURIComponent(project.id)}&id=${encodeURIComponent(project.fieldId)}` : ""}`,
     );
     if (!response.ok) return;
     const data = (await response.json()) as {
@@ -93,7 +93,10 @@ export async function resolveStartDate(
       return { error: "field-unresolved" };
     if (typeof project !== "string" || !/^\d+$/.test(project))
       return { error: "field-unreadable" };
-    const applicable = await catalog(context, project);
+    const applicable = await catalog(context, {
+      id: project,
+      fieldId: field.id,
+    });
     if (!applicable) return { error: "field-unreadable" };
     const candidates = applicable.filter(
       (item) => item.id === field.id || item.stableId === field.stableId,
