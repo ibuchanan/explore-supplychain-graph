@@ -24,7 +24,16 @@ describe("application Command contract", () => {
     const method = commands.methods.find(
       (method) => method.name === "publication.status",
     );
-    expect(method?.examples.map((example) => example.result.value)).toEqual([
+    expect(
+      method?.examples.slice(0, 3).map((example) => {
+        const {
+          ingestion: _i,
+          notification: _n,
+          ...value
+        } = example.result.value as Record<string, unknown>;
+        return value;
+      }),
+    ).toEqual([
       {
         connection: "development-loopback",
         loopback: true,
@@ -150,6 +159,7 @@ describe("application Command contract", () => {
       "workdown.export",
       "exchange.start",
       "document.get",
+      "exchange.status",
       "publication.status",
     ]);
   });

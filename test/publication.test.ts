@@ -261,3 +261,151 @@ it("ingests exact Workdown bytes as a workspace-visible document and rejects par
     expect(await ingest(record, binding)).toBe(false);
   }
 });
+it("classifies failures by kind and extracts Retry-After header only", async () => {
+  const failures: unknown[] = [];
+
+  // Test 401 authorization
+  await createGraphPublisher({
+    connectionId: async () => "platform-connection",
+    setObjects: async () => ({
+      success: false,
+      originalError: { status: 401 },
+    }),
+    failure: (failure) => {
+      failures.push(failure);
+    },
+  })(record, binding);
+  expect(failures).toContainEqual({ kind: "authorization" });
+
+  // Test 403 authorization
+  await createGraphPublisher({
+    connectionId: async () => "platform-connection",
+    setObjects: async () => ({
+      success: false,
+      originalError: { status: 403 },
+    }),
+    failure: (failure) => {
+      failures.push(failure);
+    },
+  })(record, binding);
+  expect(failures).toContainEqual({ kind: "authorization" });
+
+  // Test 400 validation
+  await createGraphPublisher({
+    connectionId: async () => "platform-connection",
+    setObjects: async () => ({
+      success: false,
+      originalError: { status: 400 },
+    }),
+    failure: (failure) => {
+      failures.push(failure);
+    },
+  })(record, binding);
+  expect(failures).toContainEqual({ kind: "validation" });
+
+  // Test 404 validation
+  await createGraphPublisher({
+    connectionId: async () => "platform-connection",
+    setObjects: async () => ({
+      success: false,
+      originalError: { status: 404 },
+    }),
+    failure: (failure) => {
+      failures.push(failure);
+    },
+  })(record, binding);
+  expect(failures).toContainEqual({ kind: "validation" });
+
+  // Test 422 validation
+  await createGraphPublisher({
+    connectionId: async () => "platform-connection",
+    setObjects: async () => ({
+      success: false,
+      originalError: { status: 422 },
+    }),
+    failure: (failure) => {
+      failures.push(failure);
+    },
+  })(record, binding);
+  expect(failures).toContainEqual({ kind: "validation" });
+
+  // Test 429 rate-limited with Retry-After
+  await createGraphPublisher({
+    connectionId: async () => "platform-connection",
+    setObjects: async () => ({
+      success: false,
+      originalError: {
+        status: 429,
+        headers: { "Retry-After": "60" },
+      },
+    }),
+    failure: (failure) => {
+      failures.push(failure);
+    },
+  })(record, binding);
+  expect(failures).toContainEqual({ kind: "rate-limited", retryAfter: "60" });
+
+  // Test 503 unavailable
+  await createGraphPublisher({
+    connectionId: async () => "platform-connection",
+    setObjects: async () => ({
+      success: false,
+      originalError: { status: 503 },
+    }),
+    failure: (failure) => {
+      failures.push(failure);
+    },
+  })(record, binding);
+  expect(failures).toContainEqual({ kind: "unavailable" });
+
+  // Test TimeoutError
+  await createGraphPublisher({
+    connectionId: async () => "platform-connection",
+    setObjects: async () => {
+      const err = new Error("timeout");
+      err.name = "TimeoutError";
+      throw err;
+    },
+    failure: (failure) => {
+      failures.push(failure);
+    },
+  })(record, binding);
+  expect(failures).toContainEqual({ kind: "timeout" });
+
+  // Test AbortError
+  await createGraphPublisher({
+    connectionId: async () => "platform-connection",
+    setObjects: async () => {
+      const err = new Error("abort");
+      err.name = "AbortError";
+      throw err;
+    },
+    failure: (failure) => {
+      failures.push(failure);
+    },
+  })(record, binding);
+  expect(failures).toContainEqual({ kind: "timeout" });
+
+  // Test 418 unknown status
+  await createGraphPublisher({
+    connectionId: async () => "platform-connection",
+    setObjects: async () => ({
+      success: false,
+      originalError: { status: 418 },
+    }),
+    failure: (failure) => {
+      failures.push(failure);
+    },
+  })(record, binding);
+  expect(failures).toContainEqual({ kind: "unknown" });
+
+  // Test missing binding → unavailable
+  await createGraphPublisher({
+    connectionId: async () => undefined,
+    setObjects: async () => ({}),
+    failure: (failure) => {
+      failures.push(failure);
+    },
+  })(record, binding);
+  expect(failures).toContainEqual({ kind: "unavailable" });
+});

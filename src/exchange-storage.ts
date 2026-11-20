@@ -1,8 +1,13 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { Filter, FilterConditions, kvs } from "@forge/kvs";
 import type { ExchangeStore, RetainedDocument } from "./exchange";
 
-type Stored = { version: string; publication?: string; payload: unknown };
+type Stored = {
+  version: string;
+  publication?: string;
+  revision?: string;
+  payload: unknown;
+};
 const publicationVersion = (sequence?: number, pending?: boolean) =>
   JSON.stringify([sequence ?? null, pending ?? null]);
 const entityName = "exchange-document";
@@ -23,7 +28,8 @@ export const exchangeStore: ExchangeStore = {
       const after = await entity().get(base);
       if (
         after?.version !== before.version ||
-        after?.publication !== before.publication
+        after?.publication !== before.publication ||
+        after?.revision !== before.revision
       )
         continue;
       if (
@@ -83,6 +89,15 @@ export const exchangeStore: ExchangeStore = {
                 .notificationPending as boolean,
             }
           : {}),
+        ...(before.revision ? { revision: before.revision } : {}),
+        ...Object.fromEntries(
+          ["delivery", "ingestion", "notification"]
+            .filter((name) => name in (before.payload as object))
+            .map((name) => [
+              name,
+              (before.payload as Record<string, unknown>)[name],
+            ]),
+        ),
         workdown: Buffer.concat(
           chunks.map((chunk) =>
             Buffer.from(chunk?.payload as string, "base64"),
@@ -110,15 +125,25 @@ export const exchangeStore: ExchangeStore = {
               publicationVersion(publication.sequence, publication.pending),
             ),
       );
+    if (publication)
+      conditions.and(
+        "revision",
+        publication.revision === undefined
+          ? FilterConditions.notExists()
+          : FilterConditions.equalTo(publication.revision),
+      );
+    const revision = randomUUID();
     const {
       workdown: _workdown,
       updateSequenceNumber: _sequence,
+      revision: _revision,
       ...metadata
     } = value;
     const transaction = kvs.transact().set(
       base,
       {
         version,
+        revision,
         ...(value.publishedSequence === undefined &&
         value.notificationPending === undefined
           ? {}
@@ -158,7 +183,8 @@ export const exchangeStore: ExchangeStore = {
         (current.updateSequenceNumber > previous ||
           (publication &&
             (current.publishedSequence !== publication.sequence ||
-              current.notificationPending !== publication.pending)))
+              current.notificationPending !== publication.pending ||
+              current.revision !== publication.revision)))
       )
         return false;
       throw error;

@@ -92,18 +92,26 @@ it("persists publication metadata with atomic guards and carries it across newer
     notificationPending: true,
   };
   expect(
-    await exchangeStore.compareAndSet("publication", 1, published, {}),
+    await exchangeStore.compareAndSet("publication", 1, published, {
+      revision: (await exchangeStore.read("publication"))?.revision,
+    }),
   ).toBe(true);
-  expect(await exchangeStore.read("publication")).toEqual(published);
+  expect(await exchangeStore.read("publication")).toMatchObject(published);
   expect(
-    await exchangeStore.compareAndSet("publication", 1, published, {}),
+    await exchangeStore.compareAndSet("publication", 1, published, {
+      revision: (await exchangeStore.read("publication"))?.revision,
+    }),
   ).toBe(false);
   expect(
     await exchangeStore.compareAndSet(
       "publication",
       1,
       { ...published, notificationPending: false },
-      { sequence: 1, pending: true },
+      {
+        sequence: 1,
+        pending: true,
+        revision: (await exchangeStore.read("publication"))?.revision,
+      },
     ),
   ).toBe(true);
   await exchangeStore.compareAndSet("publication", 1, {
@@ -137,14 +145,14 @@ it("atomically round-trips the full UTF-8 export bound and rejects a stale write
   expect(await exchangeStore.compareAndSet("scoped identity", 0, record)).toBe(
     true,
   );
-  expect(await exchangeStore.read("scoped identity")).toEqual(record);
+  expect(await exchangeStore.read("scoped identity")).toMatchObject(record);
   expect(
     await exchangeStore.compareAndSet("scoped identity", 0, {
       ...record,
       workdown: "stale bytes",
     }),
   ).toBe(false);
-  expect(await exchangeStore.read("scoped identity")).toEqual(record);
+  expect(await exchangeStore.read("scoped identity")).toMatchObject(record);
   expect(
     await exchangeStore.compareAndSet("scoped identity", 1, {
       ...record,
@@ -152,7 +160,7 @@ it("atomically round-trips the full UTF-8 export bound and rejects a stale write
       workdown: "latest bytes",
     }),
   ).toBe(true);
-  expect(await exchangeStore.read("scoped identity")).toEqual({
+  expect(await exchangeStore.read("scoped identity")).toMatchObject({
     ...record,
     updateSequenceNumber: 2,
     workdown: "latest bytes",
@@ -161,7 +169,7 @@ it("atomically round-trips the full UTF-8 export bound and rejects a stale write
 it("confirms an uncertain atomic write by readback and propagates a failed write", async () => {
   state.afterCommit = true;
   expect(await exchangeStore.compareAndSet("key", 0, record)).toBe(false);
-  expect(await exchangeStore.read("key")).toEqual(record);
+  expect(await exchangeStore.read("key")).toMatchObject(record);
   state.afterCommit = false;
   state.fail = true;
   await expect(exchangeStore.compareAndSet("other", 0, record)).rejects.toThrow(

@@ -15,6 +15,11 @@ export const webPolicy = {
     "execution": "asApp",
     "audit": "standard"
   },
+  "exchange.status": {
+    "web": true,
+    "execution": "asUser",
+    "audit": "standard"
+  },
   "publication.status": {
     "web": true,
     "execution": "asApp",

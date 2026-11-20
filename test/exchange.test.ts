@@ -58,9 +58,35 @@ const defaults = () => ({
   environment: () => "DEVELOPMENT",
   generate: async () => ok<string, string>(workdown),
   isProjectAdmin: async () => true,
+  now: () => 0,
+  random: () => 0.5,
 });
 
 describe("Exchange business Commands", () => {
+  it("reads source delivery progress only after current Subject authorization", async () => {
+    let authorized = true;
+    const business = createExchangeCommands({
+      ...defaults(),
+      isProjectAdmin: async () => authorized,
+    });
+    await business.start(params, context);
+    expect(await business.sourceStatus(read, context)).toMatchObject({
+      value: {
+        ...read,
+        preparedSequence: 1,
+        delivery: {
+          state: "succeeded",
+          sequence: 1,
+          lastSuccessfulSequence: 1,
+          attempts: 1,
+        },
+      },
+    });
+    authorized = false;
+    expect(await business.sourceStatus(read, context)).toEqual({
+      error: "forbidden",
+    });
+  });
   it("does not disclose when principal retention fails", async () => {
     let deliveries = 0;
     const commands = createExchangeCommands({
@@ -142,7 +168,7 @@ describe("Exchange business Commands", () => {
       },
     });
     await commands.start(params, context);
-    expect(await commands.status(read, context)).toEqual({
+    expect(await commands.status(read, context)).toMatchObject({
       value: {
         ...read,
         loopback: true,
@@ -207,12 +233,14 @@ describe("Exchange business Commands", () => {
   it("retains a rejected newer update without inventing a Publication and retries pending notification independently", async () => {
     let bytes = workdown;
     let acknowledged = true;
+    let clock = 0;
     let notifyFails = true;
     let ingestions = 0;
     const delivered: number[] = [];
     const commands = createExchangeCommands({
       ...defaults(),
       generate: async () => ok(bytes),
+      now: () => clock,
       ingest: async () => {
         ingestions++;
         return acknowledged;
@@ -229,7 +257,11 @@ describe("Exchange business Commands", () => {
     notifyFails = false;
     await commands.start(params, context);
     expect(ingestions).toBe(1);
-    expect(delivered).toEqual([1]);
+    await commands.consume(
+      { body: { ...read, stage: "notification", sequence: 1 } },
+      context,
+    );
+    expect(delivered).toEqual([]);
     acknowledged = false;
     bytes = workdown.replace("No description provided.", "Not yet ingested.");
     await commands.start(params, context);
@@ -239,8 +271,17 @@ describe("Exchange business Commands", () => {
     expect(await commands.get(read, context)).toMatchObject({
       value: { workdown: bytes },
     });
-    expect(delivered).toEqual([1]);
+    expect(delivered).toEqual([]);
     acknowledged = true;
+    clock = 60000;
+    await commands.consume(
+      { body: { ...read, stage: "notification", sequence: 1 } },
+      context,
+    );
+    await commands.consume(
+      { body: { ...read, stage: "ingestion", sequence: 2 } },
+      context,
+    );
     await Promise.all([
       commands.start(params, context),
       commands.start(params, context),
@@ -252,11 +293,13 @@ describe("Exchange business Commands", () => {
   });
   it("does not discard a failed Publication notification when newer content is retained", async () => {
     let fail = true;
+    let clock = 0;
     let bytes = workdown;
     const sequences: number[] = [];
     const commands = createExchangeCommands({
       ...defaults(),
       generate: async () => ok(bytes),
+      now: () => clock,
       ingest: async () => true,
       notify: async (event) => {
         if (fail) throw new Error("offline");
@@ -267,12 +310,20 @@ describe("Exchange business Commands", () => {
     bytes = workdown.replace("No description provided.", "New content.");
     await commands.start(params, context);
     fail = false;
-    await commands.start(params, context);
+    clock = 60000;
+    await commands.consume(
+      { body: { ...read, stage: "notification", sequence: 1 } },
+      context,
+    );
+    await commands.consume(
+      { body: { ...read, stage: "ingestion", sequence: 2 } },
+      context,
+    );
     expect(sequences).toEqual([1, 2]);
   });
   it("keeps status destination-authenticated, installation-scoped, and fails closed on storage errors", async () => {
     const commands = createExchangeCommands(defaults());
-    expect(await commands.status(read, context)).toEqual({
+    expect(await commands.status(read, context)).toMatchObject({
       error: "document-unavailable",
     });
     expect(
@@ -310,7 +361,7 @@ describe("Exchange business Commands", () => {
   it("reports accepted content as unpublished until TWG acknowledges it", async () => {
     const commands = createExchangeCommands(defaults());
     await commands.start(params, context);
-    expect(await commands.status(read, context)).toEqual({
+    expect(await commands.status(read, context)).toMatchObject({
       value: {
         ...read,
         loopback: true,
@@ -422,8 +473,8 @@ describe("Exchange business Commands", () => {
     expect(await source.start(params, context)).toEqual({
       error: "delivery-unconfirmed",
     });
-    expect(await source.start(params, context)).toMatchObject({
-      value: { updateSequenceNumber: 1 },
+    expect(await source.start(params, context)).toEqual({
+      error: "delivery-unconfirmed",
     });
   });
   it("starts immediately and reads retained bytes as a destination reader without source access", async () => {

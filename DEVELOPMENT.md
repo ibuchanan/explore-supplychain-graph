@@ -331,6 +331,24 @@ acceptance checks is not an established 401 fix. A service-trace investigation
 or a separately approved controlled invocation-context comparison is the next
 step. No diagnostic hook currently runs ingestion from a connector callback.
 
+## Verify native retry changes
+
+Retry policy and evidence limits are specified in
+[Native retries and safe status](specs/workdown-retries.md). The new
+`workdown-retries` consumer invokes `retry-trigger.onRetry`; it resolves the
+retained sharing principal and delegates to the shared Exchange consumer.
+`exchange.status` reads source delivery progress; `publication.status` adds
+independent ingestion and notification status. Reads never schedule work.
+
+Run `npx vitest run test/retry-consumer.test.ts test/retry-trigger.test.ts`
+for controlled policy and trusted adapter checks, then `npm run check`.
+There are no real sleeps or background recovery sweep. Queue timing, retention,
+and offline principal behavior are not established by local tests. The consumer
+and retained entity revision declaration need an approved deployment/upgrade
+before installed verification; do not infer activation from local Forge lint.
+Use a separately approved safe fault setup for installed transient/exhaustion
+checks. Do not introduce an authentication bypass or test-only public Command.
+
 ## Find implementation and historical evidence
 
 - `src/workdown*.ts`, `src/jira.ts`: Jira export, eligibility, description,

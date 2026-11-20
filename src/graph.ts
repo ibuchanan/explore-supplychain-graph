@@ -7,6 +7,7 @@ import { installation } from "./jira";
 import {
   createGraphPublisher,
   createPublicationDispatcher,
+  type IngestionFailure,
 } from "./publication";
 
 const logger = createForgeLogger({ name: "workdown", pretty: false });
@@ -78,7 +79,7 @@ export const onGraphConnectionChange = createGraphConnectionHandler({
       "workdown.graph.connection",
     ),
 });
-export const ingestWorkdown = createGraphPublisher({
+const publisherDependencies: Parameters<typeof createGraphPublisher>[0] = {
   connectionId: async (binding: Binding) => {
     const runtime = getAppContext();
     if (
@@ -121,12 +122,26 @@ export const ingestWorkdown = createGraphPublisher({
     return connectionId;
   },
   setObjects: (request) => graph.setObjects(request),
-  report: (outcome, details) =>
+  report: ((outcome, details) =>
     logger.info(
       { stage: "graph-ingestion", outcome, ...details },
       "workdown.graph.ingestion",
-    ),
-});
+    )) as NonNullable<Parameters<typeof createGraphPublisher>[0]["report"]>,
+};
+export async function ingestWorkdown(
+  record: Parameters<ReturnType<typeof createGraphPublisher>>[0],
+  binding: Binding,
+) {
+  let failure: IngestionFailure | undefined;
+  const accepted = await createGraphPublisher({
+    ...publisherDependencies,
+    failure: (value) => {
+      failure = value;
+    },
+  })(record, binding);
+  if (!accepted) throw failure ?? { kind: "unknown" };
+  return true;
+}
 // Destination-local application handlers attach here; no HTTP receiver or
 // Forge App Event is implied. External notification belongs to its own adapter.
 export const dispatchPublication = createPublicationDispatcher([]);

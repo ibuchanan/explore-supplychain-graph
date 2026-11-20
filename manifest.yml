@@ -34,7 +34,13 @@ modules:
       function: jira-change
       events:
         - avi:jira:updated:issue
+  consumer:
+    - key: workdown-retry-consumer
+      queue: workdown-retries
+      function: retry
   function:
+    - key: retry
+      handler: retry-trigger.onRetry
     - key: jira-change
       handler: jira-trigger.onJiraChange
     - key: graph-connection
@@ -60,6 +66,8 @@ app:
     entities:
       - name: exchange-document
         attributes:
+          revision:
+            type: string
           version:
             type: string
           payload:

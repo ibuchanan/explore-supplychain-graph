@@ -3,6 +3,15 @@
 <!-- cspell:words openrpc reingesting workdown Workdown Frontmatter -->
 <!-- cspell:words readback devb stargate webtrigger Rovo -->
 
+## Native retry implementation — 2026-11-20
+
+The local implementation now adds safe stage progress and Forge-native retries;
+see [the current retry specification](workdown-retries.md). This supersedes the
+historical statements below that no failure enum exists and automatic scheduling
+is unimplemented. Unchanged starts no longer bypass retry backoff, and an empty
+notification dispatcher reports disabled. Existing cloud evidence below predates
+these changes and does not verify the new consumer or status fields.
+
 ## Current evidence
 
 As of 2026-11-19, deployed Publication acknowledgment and manual Rovo Search

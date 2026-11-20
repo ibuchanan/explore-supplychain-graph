@@ -99,7 +99,7 @@
           ],
           "result": {
             "name": "Workdown document",
-            "value": "---\nformat: \"workdown\"\nformat_version: 1\ntype: \"WorkItem\"\nsource_id: \"ari:cloud:jira:00000000-0000-4000-8000-000000000001:issue/10042\"\ntitle: \"Publish partner availability\"\nresource: \"https://source.example.com/browse/DEMO-42\"\nwork_type: \"Epic\"\nkey: \"DEMO-42\"\nwork_status:\n  name: \"In Progress\"\n  category: \"in_progress\"\ncreated_at: \"2026-11-01T09:00:00.000Z\"\nupdated_at: \"2026-11-15T10:30:00.000Z\"\ngenerated:\n  by: \"workdown/1\"\nsources:\n  - id: \"ari:cloud:jira:00000000-0000-4000-8000-000000000001:issue/10042\"\n    resource: \"https://source.example.com/browse/DEMO-42\"\n    title: \"Publish partner availability\"\n    last_modified: \"2026-11-15T10:30:00.000Z\"\n  - id: \"ari:cloud:jira:00000000-0000-4000-8000-000000000001:issue/10043\"\n    resource: \"https://source.example.com/browse/DEMO-43\"\n    title: \"Define availability response\"\nchildren:\n  - source_id: \"ari:cloud:jira:00000000-0000-4000-8000-000000000001:issue/10043\"\n    title: \"Define availability response\"\n    resource: \"https://source.example.com/browse/DEMO-43\"\n    work_type: \"Story\"\n    key: \"DEMO-43\"\n    work_status:\n      name: \"To Do\"\n      category: \"todo\"\n---\n\n# Publish partner availability\n\n## Description\n\n**Acceptance criteria**\n\n- First item\n\n[Source guide](https://example.com/guide)\n\n[media omitted]\n\n## Children\n\n| Work item | Type | Status | Resolution |\n| --- | --- | --- | --- |\n| [DEMO\\-43: Define availability response](https://source.example.com/browse/DEMO-43) | Story | To Do | — |\n"
+            "value": "---\nformat: \"workdown\"\nformat_version: 1\ntype: \"WorkItem\"\nsource_id: \"ari:cloud:jira:00000000-0000-4000-8000-000000000001:issue/10042\"\ntitle: \"Publish partner availability\"\nresource: \"https://source.example.com/browse/DEMO-42\"\nwork_type: \"Epic\"\nkey: \"DEMO-42\"\nwork_status:\n  name: \"In Progress\"\n  category: \"in_progress\"\ncreated_at: \"2026-11-01T09:00:00.000Z\"\nupdated_at: \"2026-11-15T10:30:00.000Z\"\ngenerated:\n  by: \"workdown/1\"\nsources:\n  - id: \"ari:cloud:jira:00000000-0000-4000-8000-000000000001:issue/10042\"\n    resource: \"https://source.example.com/browse/DEMO-42\"\n    title: \"Publish partner availability\"\n    last_modified: \"2026-11-15T10:30:00.000Z\"\n  - id: \"ari:cloud:jira:00000000-0000-4000-8000-000000000001:issue/10043\"\n    resource: \"https://source.example.com/browse/DEMO-43\"\n    title: \"Define availability response\"\nchildren:\n  - source_id: \"ari:cloud:jira:00000000-0000-4000-8000-000000000001:issue/10043\"\n    title: \"Define availability response\"\n    resource: \"https://source.example.com/browse/DEMO-43\"\n    work_type: \"Story\"\n    key: \"DEMO-43\"\n    work_status:\n      name: \"To Do\"\n      category: \"todo\"\n---\n\n# Publish partner availability\n\n## Description\n\n**Acceptance criteria**\n\n- First item\n\n[Source guide](https://example.com/guide)\n\n[media omitted]\n\n## Children\n\n| Work item | Type | Status | Resolution |\n| --- | --- | --- | --- |\n| [DEMO\\-43: Define availability response](https://source.example.com/browse/DEMO-43) | Story | To Do | \u2014 |\n"
           }
         }
       ]
@@ -361,9 +361,272 @@
       ]
     },
     {
+      "name": "exchange.status",
+      "summary": "Read source-local delivery progress for an Exchange",
+      "description": "Read source-local prepared sequence and delivery acknowledgment, not destination Publication. Current source Subject Project Admin authority is required before record lookup; missing/unreadable authority is Forbidden. Only active outbound Connection context is accepted. Read-only, installation-scoped, no remote probe, scheduling, credentials or raw diagnostics. Errors match publication.status. Retry and migration rules: specs/workdown-retries.md.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "connection",
+          "description": "Source-local outbound Connection context, not a site URL.",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/ConnectionId"
+          }
+        },
+        {
+          "name": "document",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/DocumentId"
+          }
+        }
+      ],
+      "result": {
+        "name": "Exchange delivery status",
+        "schema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "connection",
+            "loopback",
+            "document",
+            "preparedSequence",
+            "delivery"
+          ],
+          "properties": {
+            "connection": {
+              "$ref": "#/components/schemas/ConnectionId"
+            },
+            "loopback": {
+              "type": "boolean"
+            },
+            "document": {
+              "$ref": "#/components/schemas/DocumentId"
+            },
+            "preparedSequence": {
+              "$ref": "#/components/schemas/UpdateSequenceNumber"
+            },
+            "delivery": {
+              "$ref": "#/components/schemas/RetryStageStatus"
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "code": -32602,
+          "message": "Invalid params"
+        },
+        {
+          "code": -32001,
+          "message": "Forbidden"
+        },
+        {
+          "code": -32010,
+          "message": "Connection unavailable"
+        },
+        {
+          "code": -32012,
+          "message": "Storage unavailable"
+        },
+        {
+          "code": -32013,
+          "message": "Document unavailable"
+        }
+      ],
+      "x-forge-ahead": {
+        "web": true,
+        "execution": "asUser",
+        "audit": "standard"
+      },
+      "examples": [
+        {
+          "name": "Delivery retry pending; previous sequence acknowledged",
+          "params": [
+            {
+              "name": "connection",
+              "value": "development-loopback"
+            },
+            {
+              "name": "document",
+              "value": "ari:cloud:jira:00000000-0000-4000-8000-000000000001:issue/10042"
+            }
+          ],
+          "result": {
+            "name": "Exchange delivery status",
+            "value": {
+              "connection": "development-loopback",
+              "loopback": true,
+              "document": "ari:cloud:jira:00000000-0000-4000-8000-000000000001:issue/10042",
+              "preparedSequence": 3,
+              "delivery": {
+                "state": "retrying",
+                "sequence": 3,
+                "lastSuccessfulSequence": 2,
+                "attempts": 1,
+                "lastFailure": "timeout",
+                "nextAttemptAt": "2026-11-20T14:00:05.000Z"
+              }
+            }
+          }
+        },
+        {
+          "name": "Delivery acknowledged; destination Publication not asserted",
+          "params": [
+            {
+              "name": "connection",
+              "value": "development-loopback"
+            },
+            {
+              "name": "document",
+              "value": "ari:cloud:jira:00000000-0000-4000-8000-000000000001:issue/10042"
+            }
+          ],
+          "result": {
+            "name": "Exchange delivery status",
+            "value": {
+              "connection": "development-loopback",
+              "loopback": true,
+              "document": "ari:cloud:jira:00000000-0000-4000-8000-000000000001:issue/10042",
+              "preparedSequence": 3,
+              "delivery": {
+                "state": "succeeded",
+                "sequence": 3,
+                "lastSuccessfulSequence": 3,
+                "attempts": 2,
+                "lastFailure": null,
+                "nextAttemptAt": null
+              }
+            }
+          }
+        },
+        {
+          "name": "Delivery exhausted; previous acknowledgment retained",
+          "params": [
+            {
+              "name": "connection",
+              "value": "development-loopback"
+            },
+            {
+              "name": "document",
+              "value": "ari:cloud:jira:00000000-0000-4000-8000-000000000001:issue/10042"
+            }
+          ],
+          "result": {
+            "name": "Exchange delivery status",
+            "value": {
+              "connection": "development-loopback",
+              "loopback": true,
+              "document": "ari:cloud:jira:00000000-0000-4000-8000-000000000001:issue/10042",
+              "preparedSequence": 3,
+              "delivery": {
+                "state": "exhausted",
+                "sequence": 3,
+                "lastSuccessfulSequence": 2,
+                "attempts": 4,
+                "lastFailure": "unavailable",
+                "nextAttemptAt": null
+              }
+            }
+          }
+        },
+        {
+          "name": "Delivery authorization failure is permanent",
+          "params": [
+            {
+              "name": "connection",
+              "value": "development-loopback"
+            },
+            {
+              "name": "document",
+              "value": "ari:cloud:jira:00000000-0000-4000-8000-000000000001:issue/10042"
+            }
+          ],
+          "result": {
+            "name": "Exchange delivery status",
+            "value": {
+              "connection": "development-loopback",
+              "loopback": true,
+              "document": "ari:cloud:jira:00000000-0000-4000-8000-000000000001:issue/10042",
+              "preparedSequence": 3,
+              "delivery": {
+                "state": "failed",
+                "sequence": 3,
+                "lastSuccessfulSequence": 2,
+                "attempts": 1,
+                "lastFailure": "authorization",
+                "nextAttemptAt": null
+              }
+            }
+          }
+        },
+        {
+          "name": "Legacy delivery outcome is unknown",
+          "params": [
+            {
+              "name": "connection",
+              "value": "development-loopback"
+            },
+            {
+              "name": "document",
+              "value": "ari:cloud:jira:00000000-0000-4000-8000-000000000001:issue/10042"
+            }
+          ],
+          "result": {
+            "name": "Exchange delivery status",
+            "value": {
+              "connection": "development-loopback",
+              "loopback": true,
+              "document": "ari:cloud:jira:00000000-0000-4000-8000-000000000001:issue/10042",
+              "preparedSequence": 3,
+              "delivery": {
+                "state": "unknown",
+                "sequence": 3,
+                "lastSuccessfulSequence": null,
+                "attempts": null,
+                "lastFailure": null,
+                "nextAttemptAt": null
+              }
+            }
+          }
+        },
+        {
+          "name": "Provider requires more than 900 seconds: automatic retry stopped",
+          "params": [
+            {
+              "name": "connection",
+              "value": "development-loopback"
+            },
+            {
+              "name": "document",
+              "value": "ari:cloud:jira:00000000-0000-4000-8000-000000000001:issue/10042"
+            }
+          ],
+          "result": {
+            "name": "Exchange delivery status",
+            "value": {
+              "connection": "development-loopback",
+              "loopback": true,
+              "document": "ari:cloud:jira:00000000-0000-4000-8000-000000000001:issue/10042",
+              "preparedSequence": 3,
+              "delivery": {
+                "state": "retry-delay-unsupported",
+                "sequence": 3,
+                "lastSuccessfulSequence": 2,
+                "attempts": 1,
+                "lastFailure": "rate-limited",
+                "nextAttemptAt": null
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "publication.status",
       "summary": "Read the latest Publication of a retained Workdown at the destination",
-      "description": "Read-only. Authenticate a reader within the destination installation's site boundary, exactly as document.get does: no source-site access, Project Admin authority, or destination project is required, and the Connection and document are resolved only within the trusted local installation. An unknown, wrong-direction, pending, revoked, or unavailable incoming Connection yields Connection unavailable without state details. A missing or withdrawn document yields Document unavailable. A Publication exists only after destination acceptance and acknowledged TWG ingestion of that update, and is identified by Connection, document and updateSequenceNumber; it has no separate ID. An accepted update whose ingestion has not been acknowledged, or was rejected, is not yet a Publication and is reported only by its absence. The destination is latest-only: this reports the sequence currently retained and the latest sequence whose ingestion was acknowledged, with no per-sequence query and no history. publishedSequence is null until the first acknowledged ingestion and is never greater than retainedSequence; when it is lower or null, the retained update is not yet a Publication. An HTTP success containing a rejected object is not an acknowledgment. Both sequences come from one consistent read. Status never implies Search visibility, peer delivery, webhook delivery, or that a Flow ran, and returns no document content, TWG diagnostics, or rejection details. Storage failure never masquerades as a missing document.",
+      "description": "Read retained/published sequences and independent ingestion/notification status from a destination-local snapshot, under document.get authentication. No source access is inherited. Read-only; failures are safe categories, never raw diagnostics. Notification means destination-local dispatch, not the future Automation webhook. Retry and migration rules: specs/workdown-retries.md.",
       "paramStructure": "by-name",
       "params": [
         {
@@ -392,7 +655,9 @@
             "loopback",
             "document",
             "retainedSequence",
-            "publishedSequence"
+            "publishedSequence",
+            "ingestion",
+            "notification"
           ],
           "properties": {
             "connection": {
@@ -416,6 +681,12 @@
                   "type": "null"
                 }
               ]
+            },
+            "ingestion": {
+              "$ref": "#/components/schemas/RetryStageStatus"
+            },
+            "notification": {
+              "$ref": "#/components/schemas/RetryStageStatus"
             }
           }
         }
@@ -467,7 +738,23 @@
               "loopback": true,
               "document": "ari:cloud:jira:00000000-0000-4000-8000-000000000001:issue/10042",
               "retainedSequence": 2,
-              "publishedSequence": 2
+              "publishedSequence": 2,
+              "ingestion": {
+                "state": "succeeded",
+                "sequence": 2,
+                "lastSuccessfulSequence": 2,
+                "attempts": 1,
+                "lastFailure": null,
+                "nextAttemptAt": null
+              },
+              "notification": {
+                "state": "disabled",
+                "sequence": null,
+                "lastSuccessfulSequence": null,
+                "attempts": 0,
+                "lastFailure": null,
+                "nextAttemptAt": null
+              }
             }
           }
         },
@@ -490,7 +777,23 @@
               "loopback": true,
               "document": "ari:cloud:jira:00000000-0000-4000-8000-000000000001:issue/10042",
               "retainedSequence": 3,
-              "publishedSequence": 2
+              "publishedSequence": 2,
+              "ingestion": {
+                "state": "retrying",
+                "sequence": 3,
+                "lastSuccessfulSequence": 2,
+                "attempts": 1,
+                "lastFailure": "rate-limited",
+                "nextAttemptAt": "2026-11-20T14:00:05.000Z"
+              },
+              "notification": {
+                "state": "disabled",
+                "sequence": null,
+                "lastSuccessfulSequence": null,
+                "attempts": 0,
+                "lastFailure": null,
+                "nextAttemptAt": null
+              }
             }
           }
         },
@@ -513,7 +816,62 @@
               "loopback": true,
               "document": "ari:cloud:jira:00000000-0000-4000-8000-000000000001:issue/10043",
               "retainedSequence": 1,
-              "publishedSequence": null
+              "publishedSequence": null,
+              "ingestion": {
+                "state": "exhausted",
+                "sequence": 1,
+                "lastSuccessfulSequence": null,
+                "attempts": 4,
+                "lastFailure": "timeout",
+                "nextAttemptAt": null
+              },
+              "notification": {
+                "state": "disabled",
+                "sequence": null,
+                "lastSuccessfulSequence": null,
+                "attempts": 0,
+                "lastFailure": null,
+                "nextAttemptAt": null
+              }
+            }
+          }
+        },
+        {
+          "name": "Newer ingestion permanently failed; older Publication notification exhausted",
+          "params": [
+            {
+              "name": "connection",
+              "value": "development-loopback"
+            },
+            {
+              "name": "document",
+              "value": "ari:cloud:jira:00000000-0000-4000-8000-000000000001:issue/10042"
+            }
+          ],
+          "result": {
+            "name": "Publication status",
+            "value": {
+              "connection": "development-loopback",
+              "loopback": true,
+              "document": "ari:cloud:jira:00000000-0000-4000-8000-000000000001:issue/10042",
+              "retainedSequence": 3,
+              "publishedSequence": 2,
+              "ingestion": {
+                "state": "failed",
+                "sequence": 3,
+                "lastSuccessfulSequence": 2,
+                "attempts": 1,
+                "lastFailure": "validation",
+                "nextAttemptAt": null
+              },
+              "notification": {
+                "state": "exhausted",
+                "sequence": 2,
+                "lastSuccessfulSequence": 1,
+                "attempts": 4,
+                "lastFailure": "unavailable",
+                "nextAttemptAt": null
+              }
             }
           }
         }
@@ -538,6 +896,102 @@
         "minimum": 1,
         "maximum": 9007199254740991,
         "description": "Positive JSON safe integer, monotonically increasing per Connection/document. Unchanged canonical bytes reuse the sequence; retries reuse bytes and sequence. Gaps are allowed. Not a timestamp or historical-version selector. Exhaustion must fail without wrapping."
+      },
+      "RetryFailureKind": {
+        "type": "string",
+        "enum": [
+          "authorization",
+          "validation",
+          "rate-limited",
+          "unavailable",
+          "timeout",
+          "unknown"
+        ],
+        "description": "Safe category only; authorization/validation are permanent. No raw error or credential."
+      },
+      "RetryStageStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "state",
+          "sequence",
+          "lastSuccessfulSequence",
+          "attempts",
+          "lastFailure",
+          "nextAttemptAt"
+        ],
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "idle",
+              "pending",
+              "running",
+              "retrying",
+              "succeeded",
+              "failed",
+              "exhausted",
+              "disabled",
+              "unknown",
+              "retry-delay-unsupported"
+            ]
+          },
+          "sequence": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UpdateSequenceNumber"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastSuccessfulSequence": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UpdateSequenceNumber"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "attempts": {
+            "oneOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastFailure": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RetryFailureKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "nextAttemptAt": {
+            "oneOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+                "description": "UTC ISO 8601 timestamp with milliseconds; must also be a real calendar instant."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "description": "Last recorded local progress, not remote truth or a live-worker claim. attempts is an observed 0\u20134 policy ordinal, not total network calls. Acknowledged last success survives failure. No enqueue-gap/retention recovery. Legacy unknowns stay null. Invariants and retry policy: specs/workdown-retries.md."
       }
     }
   },

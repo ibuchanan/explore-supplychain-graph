@@ -6,6 +6,10 @@ import type {
   RetainedDocument,
 } from "./exchange";
 import { validatePublicationNotification } from "./generated/validators.js";
+
+import { classifyFailure, type IngestionFailure } from "./retry";
+
+export type { IngestionFailure } from "./retry";
 export function createPublicationDispatcher(
   handlers: Array<(notification: PublicationNotification) => Promise<void>>,
 ) {
@@ -36,6 +40,7 @@ export function createGraphPublisher(deps: {
       traceId?: string;
     },
   ) => void;
+  failure?: (failure: IngestionFailure) => void;
 }) {
   return async (
     record: RetainedDocument,
@@ -45,6 +50,7 @@ export function createGraphPublisher(deps: {
       const connectionId = await deps.connectionId(binding);
       if (!connectionId) {
         deps.report?.("connection-unavailable");
+        deps.failure?.({ kind: "unavailable" });
         return false;
       }
       const metadata = parse(
@@ -58,6 +64,7 @@ export function createGraphPublisher(deps: {
       const timestamp = metadata.updated_at ?? metadata.created_at;
       if (!timestamp) {
         deps.report?.("source-time-unavailable");
+        deps.failure?.({ kind: "validation" });
         return false;
       }
       // Plain text preserves the canonical Markdown and Frontmatter without
@@ -89,6 +96,7 @@ export function createGraphPublisher(deps: {
       });
       if (!response || typeof response !== "object") {
         deps.report?.("not-acknowledged");
+        deps.failure?.({ kind: "unavailable" });
         return false;
       }
       const result = response as types.BulkObjectResponse;
@@ -115,6 +123,9 @@ export function createGraphPublisher(deps: {
         "traceId" in result.originalError
           ? result.originalError.traceId
           : undefined;
+      if (!acknowledged && result.originalError) {
+        deps.failure?.(classifyFailure(result.originalError));
+      }
       deps.report?.(acknowledged ? "acknowledged" : "not-acknowledged", {
         sdkSuccess: result.success === true,
         acceptedCount: result.results?.accepted?.length ?? 0,
@@ -133,8 +144,9 @@ export function createGraphPublisher(deps: {
           : {}),
       });
       return acknowledged;
-    } catch {
+    } catch (error) {
       deps.report?.("exception");
+      deps.failure?.(classifyFailure(error));
       return false;
     }
   };

@@ -37,6 +37,7 @@ const handle: typeof adminHandle = async (request, context) => {
     /* Malformed requests retain the existing admin admission policy. */
   }
   const response = await (method === "exchange.start" ||
+    method === "exchange.status" ||
     method === "document.get" ||
     method === "publication.status"
     ? authenticatedHandle

@@ -1,4 +1,5 @@
 import { getAppContext } from "@forge/api";
+import { Queue } from "@forge/events";
 import { createForgeLogger } from "@forge-ahead/logging";
 import {
   createWebDispatcher,
@@ -19,6 +20,7 @@ import { exportWorkdown } from "./workdown";
 import { validateWorkdown } from "./workdown-validation";
 
 const logger = createForgeLogger({ name: "workdown", pretty: false });
+const retryQueue = new Queue({ key: "workdown-retries" });
 export const exchange = createExchangeCommands({
   store: exchangeStore,
   remember: rememberExchange,
@@ -33,6 +35,17 @@ export const exchange = createExchangeCommands({
   isProjectAdmin,
   ingest: ingestWorkdown,
   notify: dispatchPublication,
+  notificationEnabled: false,
+  schedule: async (body, delayInSeconds) => {
+    await retryQueue.push({
+      body,
+      delayInSeconds,
+      concurrency: {
+        key: JSON.stringify([body.connection, body.document]),
+        limit: 1,
+      },
+    });
+  },
   reportPublication: (stage, outcome) =>
     logger.info({ stage, outcome }, "workdown.publication"),
 });
@@ -45,6 +58,7 @@ export const options: WebOptions<CommandContext> = {
     "exchange.start": exchange.start,
     "document.get": exchange.get,
     "publication.status": exchange.status,
+    "exchange.status": exchange.sourceStatus,
   },
   inputValidators,
   outputValidators: {
@@ -56,6 +70,7 @@ export const options: WebOptions<CommandContext> = {
   selection: () => ({
     "workdown.export": "asUser",
     "exchange.start": "asUser",
+    "exchange.status": "asUser",
     "document.get": "asApp",
     "publication.status": "asApp",
   }),

@@ -103,6 +103,7 @@ describe("discovery dispatcher", () => {
       "workdown.export",
       "exchange.start",
       "document.get",
+      "exchange.status",
       "publication.status",
     ]);
   });
