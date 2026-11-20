@@ -17,6 +17,12 @@ const workdown = readFileSync(
 );
 const cloudId = "00000000-0000-4000-8000-000000000001";
 const document = `ari:cloud:jira:${cloudId}:issue/10042`;
+const registration = {
+  cloudId,
+  document,
+  connection: "development-loopback",
+  accountId: "sharing-admin",
+};
 const context = {
   installation: {
     cloudId,
@@ -30,29 +36,17 @@ const context = {
 const params = {
   issue: "DEMO-42",
   profile: "jira-epic" as const,
-  connection: "development-loopback",
+  connection: registration.connection,
 };
 
 describe("Jira product event intake", () => {
-  it("ignores malformed, foreign-installation, and unsupported source-deletion events", async () => {
+  it("ignores malformed, foreign-installation, and non-update events", async () => {
     let calls = 0;
     const handler = createJiraEventHandler({
       registrations: async () => [
-        {
-          cloudId: "foreign",
-          document,
-          connection: params.connection,
-          accountId: "other",
-        },
-        {
-          cloudId,
-          document,
-          connection: params.connection,
-          accountId: "sharing-admin",
-        },
+        { ...registration, cloudId: "foreign" },
+        registration,
       ],
-      retained: async () => workdown,
-      parent: async () => undefined,
       republish: async () => {
         calls++;
         return {};
@@ -63,6 +57,7 @@ describe("Jira product event intake", () => {
       {},
       { eventType: "avi:jira:updated:issue", issue: { id: 10042 } },
       { eventType: "publication.published", issue: { id: "10042" } },
+      { eventType: "avi:jira:created:issue", issue: { id: "10042" } },
       { eventType: "avi:jira:deleted:issue", issue: { id: "10042" } },
     ]) {
       expect(await handler(event, cloudId)).toEqual({
@@ -70,21 +65,21 @@ describe("Jira product event intake", () => {
         failed: 0,
       });
     }
+    await handler(
+      { eventType: "avi:jira:updated:issue", issue: { id: "10042" } },
+      "other-installation",
+    );
     expect(calls).toBe(0);
   });
   it("fails closed on denied user reads while continuing independent Exchanges", async () => {
     const handler = createJiraEventHandler({
       registrations: async () =>
         ["denied", "permitted"].map((accountId) => ({
-          cloudId,
-          document,
+          ...registration,
           accountId,
-          connection: params.connection,
         })),
-      retained: async () => workdown,
-      parent: async () => undefined,
-      republish: async (registration) => {
-        if (registration.accountId === "denied")
+      republish: async (current) => {
+        if (current.accountId === "denied")
           throw new Error("private permission details");
         return {};
       },
@@ -104,40 +99,35 @@ describe("Jira product event intake", () => {
     "avi:jira:created:issue",
     "avi:jira:updated:issue",
     "avi:jira:deleted:issue",
-  ])(
-    "locates prior and current Epics for a child via %s",
-    async (eventType) => {
-      const other = document.replace("10042", "10043");
-      const registrations = [document, other].map((document) => ({
-        cloudId,
-        connection: params.connection,
-        document,
-        accountId: "sharing-admin",
-      }));
-      const selected: string[] = [];
-      const handler = createJiraEventHandler({
-        registrations: async () => registrations,
-        retained: async (registration) =>
-          registration.document === document
-            ? workdown.replace(
-                "---\n\n#",
-                `sources_extra: []\nchildren:\n  - source_id: "ari:cloud:jira:${cloudId}:issue/10044"\n---\n\n#`,
-              )
-            : workdown,
-        parent: async () =>
-          eventType === "avi:jira:deleted:issue" ? undefined : "10043",
-        republish: async (registration) => {
-          selected.push(registration.document);
-          return {};
+  ])("ignores child changes and reparenting via %s", async (eventType) => {
+    const selected: string[] = [];
+    const handler = createJiraEventHandler({
+      registrations: async () => [
+        registration,
+        { ...registration, document: document.replace("10042", "10043") },
+      ],
+      republish: async (current) => {
+        selected.push(current.document);
+        return {};
+      },
+    });
+    expect(
+      await handler(
+        {
+          eventType,
+          issue: { id: "10044", fields: { parent: { id: "10043" } } },
+          changelog: {
+            items: [
+              { field: "IssueParentAssociation", from: "10042", to: "10043" },
+            ],
+          },
         },
-      });
-      await handler({ eventType, issue: { id: "10044" } }, cloudId);
-      expect(selected).toEqual(
-        eventType === "avi:jira:deleted:issue" ? [document] : [document, other],
-      );
-    },
-  );
-  it("republishes changed bytes through the initial Exchange pipeline, not duplicates", async () => {
+        cloudId,
+      ),
+    ).toEqual({ attempted: 0, failed: 0 });
+    expect(selected).toEqual([]);
+  });
+  it("ignores child-only changes but refreshes their snapshot on the next Subject update without duplicate Publications", async () => {
     const records = new Map<string, RetainedDocument>();
     const store: ExchangeStore = {
       read: async (key) => records.get(key),
@@ -163,32 +153,27 @@ describe("Jira product event intake", () => {
     });
     await commands.start(params, context);
     const handler = createJiraEventHandler({
-      registrations: async () => [
-        {
-          cloudId,
-          connection: params.connection,
-          document,
-          accountId: "sharing-admin",
-        },
-      ],
-      retained: async () => workdown,
-      parent: async () => undefined,
-      republish: async (registration) =>
+      registrations: async () => [registration],
+      republish: async (current) =>
         commands.start(
           { ...params, issue: "10042" },
           {
             ...context,
             principal: {
-              accountId: registration.accountId,
+              accountId: current.accountId,
               authorization: "offline-user",
             },
           },
         ),
     });
-    bytes = workdown.replaceAll(
-      "Publish partner availability",
-      "Updated availability",
-    );
+    bytes = `${workdown}\nChanged child snapshot\n`;
+    expect(
+      await handler(
+        { eventType: "avi:jira:updated:issue", issue: { id: "10044" } },
+        cloudId,
+      ),
+    ).toEqual({ attempted: 0, failed: 0 });
+    expect(publications).toBe(1);
     expect(
       await handler(
         { eventType: "avi:jira:updated:issue", issue: { id: "10042" } },

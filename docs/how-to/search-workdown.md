@@ -22,6 +22,17 @@ The Workdown result is an additional discovery route, not a replacement for
 Jira Search or evidence that Rovo Chat can answer questions from this content.
 Chat answers and citations have not been checked for this app.
 
+## Freshness of included children
+
+Only updates to the shared Epic itself trigger automatic republishing. Child
+creation, edits, deletion, and reparenting are deliberately ignored as update
+reasons. Child titles and membership in Search reflect the last published
+snapshot, not necessarily current Jira content. They can remain stale until
+the Epic is updated or an authorized user explicitly starts/repeats the
+Exchange with `exchange.start`. That command can retain and ingest content;
+a read-only `workdown.export`, `document.get`, or Search query does not refresh
+Publication. Search indexing may lag even after Publication is acknowledged.
+
 ## Before you search
 
 1. Use the intended site's Rovo Search and an authorized account.

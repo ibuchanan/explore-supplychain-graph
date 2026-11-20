@@ -33,9 +33,7 @@ modules:
     - key: workdown-jira-changes
       function: jira-change
       events:
-        - avi:jira:created:issue
         - avi:jira:updated:issue
-        - avi:jira:deleted:issue
   function:
     - key: jira-change
       handler: jira-trigger.onJiraChange

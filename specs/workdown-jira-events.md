@@ -1,6 +1,41 @@
 # Jira product event intake — ticket 22
 
-## Local implementation (2026-11-20)
+## Current policy — Epic-only update reasons (2026-11-20)
+
+The user explicitly chose to ignore child-only changes as reasons to update an
+Exchange. **Only an `avi:jira:updated:issue` whose issue identity exactly matches
+the registered Subject Epic triggers republishing.** Child creation, edits,
+deletion, and reparenting do not select either parent Epic. Source-Epic deletion
+remains unsupported. Initial or repeated authorized `exchange.start` still
+regenerates the complete eligible document, as does a selected Epic update;
+child data is not removed from the document format or export behavior.
+
+Child titles and membership can remain stale indefinitely until an Epic update
+or explicit Exchange start. A read-only export may show newer child information
+without updating retained/published content. No polling, background
+reconciliation, prior-parent retention, or child-created search consistency fix
+is introduced. This limitation is stated in the README, admin connection guide,
+and Search guide. It is an application policy, not a claim that Jira emits no
+child events.
+
+The local implementation removes parent lookup and retained-child routing and
+subscribes only to issue updates. Tests cover ignored child create/update/delete
+and reparenting payloads, exact Subject matching, retained-principal delegation,
+and regeneration of child snapshot content on a later Subject update. No scope,
+egress, Command, or document-format change is needed. **This policy change has
+not been deployed or cloud-verified.** The earlier installed successes/failure
+below describe the superseded child-triggering implementation and are preserved
+as historical evidence, not current acceptance requirements. MSD-20 remains an
+adopted fixture; no cleanup is requested.
+
+Local verification of this revision: `npm run check` passes **244 tests in 14
+files**, type checking, Forge lint, build/format/contract checks, and a
+**26.49 kB / 32 kB** bundle. README, admin/Search guides, and this evidence page
+pass Markdown lint. Broader glossary/spec lint still reports existing long
+lines; unrelated formatting and user edits were preserved.
+
+
+## Historical local implementation (2026-11-20, before Epic-only decision)
 
 This is a development-loopback implementation, not evidence that automatic
 freshness is operational. No deployment, installation, Jira mutation, cloud
@@ -177,6 +212,66 @@ shape, every included field, child events, reparenting/deletion, permission or
 principal changes, non-contributor impersonation, or actual remote-peer delivery.
 Ticket 22 remains open for those named coverage/decision gates; automatic
 freshness is not generally proven by this one successful scenario.
+
+## Approved installed child checks — 2026-11-20 10:30–10:32 local
+
+The user approved an edit/restoration of configured child MSD-5 and creation
+and deletion of one disposable child under MSD-1. Reparenting was not approved.
+The targeted installed check **failed overall** in 108.6 seconds:
+
+| Stage | Retained / published | Result |
+| --- | --- | --- |
+| Initial Exchange baseline | 3 / 3 | Established before mutations |
+| MSD-5 temporary summary edit | 4 / 4 | Automatic Publication; retained child identity/title match |
+| MSD-5 original summary restored | 5 / 5 | Automatic Publication; source summary independently restored |
+| Disposable child MSD-20 created under MSD-1 | 5 / 5 | No changed Publication within 65 seconds |
+| Delete only the newly created MSD-20 | Not reached | Jira DELETE returned HTTP 401; cleanup blocked |
+
+Follow-up read-only checks confirm MSD-5 still belongs to MSD-1 and its original
+summary is restored. **MSD-20 still exists**, with its exact test-created identity,
+parent, and synthetic summary verified. Jira child search returns MSD-5 and
+MSD-20, while retained document sequence 5 includes MSD-5 but omits MSD-20.
+This is an observed source/destination freshness failure, not merely an
+unverified case. No manual Exchange start was used after any mutation to mask it.
+
+A bounded sanitized log read returned 10867 bytes: four Jira-change completions,
+each `attempted: 1, failed: 0`, and four publication records corresponding to
+two acknowledgment-storage and two notification-storage outcomes. Without
+payload/type/identity correlation these counts do not establish which event
+caused each completion, nor why creation failed. Search visibility/event timing
+is a hypothesis, not an established root cause. No fix, retry mutation,
+reconciliation, new deployment, or instrumentation was applied.
+
+The same principal's project permissions report CREATE_ISSUES, EDIT_ISSUES,
+and DELETE_ISSUES all true, but the actual API DELETE returned 401. Credential
+scope/endpoint authorization is a possible cause, not proven. The test stopped
+writes and did not attempt another authentication route. **Operator action is
+required to delete MSD-20**, or securely update the test token with appropriate
+scope and authorize a guarded cleanup retry. Do not paste credentials in chat.
+Deletion-event Publication is still unverified, and deleting a child never
+retained in sequence 5 cannot by itself prove retained-prior-parent routing.
+
+Expected residual effects are Jira history, sequences 4/5, the Exchange registry,
+a consumed issue key, and the still-existing disposable MSD-20 until cleanup.
+The temporary verification script and detailed recovery file were removed after
+recording the outstanding cleanup here and on ticket 22; original source content
+and credentials are not retained in this evidence. A separate user modification
+to ADR 0003 was left untouched.
+
+### Fixture disposition — 2026-11-20 10:42 local
+
+The user chose to **keep MSD-20 as a fixture**. Cleanup is no longer requested;
+future checks must not delete it under the earlier disposable-child approval.
+Read-only child search reconfirmed MSD-1's native-ID lexical child order as
+MSD-5, MSD-20. The private `test/deployed.local.json` expected child list was
+updated accordingly; no Jira mutation or Exchange start accompanied adoption.
+The earlier cleanup-failure notes above describe the historical attempt, not
+an outstanding request to delete the adopted fixture. Keeping it does not
+resolve the automatic-creation Publication failure or prove deletion behavior.
+The read-only company-managed deployed export test passed with both expected
+children (1 passed, 5 filtered/skipped; 6.3 seconds). This proves the on-demand
+export now sees MSD-20, not that the retained Publication was repaired; no
+manual Exchange start or ingestion was invoked.
 
 ## Official references consulted 2026-11-20
 

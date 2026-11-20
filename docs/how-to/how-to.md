@@ -35,6 +35,18 @@ Do not put an API token, password, RPC URL, or shared secret into a connection
 nickname. This app has **no connector-specific configuration form** and does
 not ask the admin for source-system credentials.
 
+## What refreshes a shared document
+
+After an Exchange is started, only updates to its shared Epic itself trigger
+automatic republishing. Child creation, child-field edits, deletion, and
+reparenting do not trigger updates to the shared document. Children remain a
+snapshot until the next Epic update or an authorized explicit `exchange.start`.
+The full eligible child snapshot is reread on regeneration; there is no
+scheduled refresh. Merely reading/exporting a document does not republish it.
+This deliberate freshness limitation can leave child information stale
+indefinitely, including removed or reparented children. Source-Epic deletion
+also does not trigger withdrawal. Connection setup alone does not start sharing.
+
 ## Create the connection in Atlassian Administration
 
 1. Open [Atlassian Administration](https://admin.atlassian.com/) and select

@@ -1,8 +1,7 @@
 import { getAppContext } from "@forge/api";
 import { createForgeLogger } from "@forge-ahead/logging";
 import { registeredExchanges } from "./exchange-registry";
-import { exchangeStore } from "./exchange-storage";
-import { installation, jiraGet } from "./jira";
+import { installation } from "./jira";
 import { eventPrincipal } from "./jira-event-adapter";
 import { createJiraEventHandler } from "./jira-events";
 import { exchange } from "./rpc";
@@ -17,33 +16,6 @@ export async function onJiraChange(
   if (!site || getAppContext().environmentType !== "DEVELOPMENT") return;
   const handle = createJiraEventHandler({
     registrations: registeredExchanges,
-    retained: async (registration) =>
-      (
-        await exchangeStore.read(
-          JSON.stringify([
-            site.cloudId,
-            registration.connection,
-            "source",
-            registration.document,
-          ]),
-        )
-      )?.workdown,
-    parent: async (issue, registration) => {
-      const response = await jiraGet(
-        site,
-        eventPrincipal(registration.accountId).authorization,
-        `issue/${encodeURIComponent(issue)}?fields=parent&failFast=true`,
-      );
-      if (!response.ok) throw new Error("Parent read unavailable");
-      const data = (await response.json()) as {
-        fields?: { parent?: { id?: unknown } };
-      };
-      const parent = data.fields?.parent?.id;
-      if (parent === undefined) return undefined;
-      if (typeof parent !== "string" || !/^\d+$/.test(parent))
-        throw new Error("Invalid parent");
-      return parent;
-    },
     republish: (registration) =>
       exchange.start(
         {

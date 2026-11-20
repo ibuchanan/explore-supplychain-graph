@@ -34,7 +34,10 @@ A convention of Markdown with Frontmatter designed to represent work items. The 
 
 ## Jira change
 
-A change in Jira to a Subject or its included children that may alter the Workdown document, such as an edit, child creation, deletion, or reparenting. Source-side and inbound: it is what makes an Exchange stay current.
+A change in Jira that may alter a Workdown document. Only an update to the
+Subject itself is an automatic refresh reason; changes to included children are
+not. Included children represent context captured when the document is
+generated, not independently live content.
 
 ## Jira product event
 

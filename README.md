@@ -25,6 +25,11 @@ It is not a complete cross-site supply-chain integration.
   using parent-description text, a Start date value, and included child-title
   words. See [what Search can do](docs/how-to/search-workdown.md) and the
   [verification record](specs/workdown-publication-verification.md).
+- **Refresh policy:** only updates to the shared Epic itself trigger automatic
+  republishing. Child creation, edits, deletion, and reparenting do not trigger
+  refresh. Children are snapshots refreshed on the next Epic update or an
+  explicit `exchange.start`; they may remain stale indefinitely otherwise.
+  A read-only export does not refresh the retained/published document.
 - There is no implemented cross-site delivery or scheduled refresh. The current
   document link points to the source Jira issue, not a destination-local viewer.
 

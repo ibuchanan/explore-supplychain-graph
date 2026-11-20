@@ -30,20 +30,13 @@ vi.mock("../src/exchange-registry", () => ({
     ];
   },
 }));
-vi.mock("../src/exchange-storage", () => ({
-  exchangeStore: { read: async () => undefined },
-}));
 vi.mock("../src/jira-event-adapter", () => ({
   eventPrincipal: (accountId: string) => {
     state.principals.push(accountId);
     return {
       accountId,
       authorization: async () => {
-        if (state.deny) throw new Error("private access detail");
-        return {
-          ok: true,
-          json: async () => ({ fields: { parent: { id: "10042" } } }),
-        };
+        throw new Error("private access detail");
       },
     };
   },
@@ -51,6 +44,7 @@ vi.mock("../src/jira-event-adapter", () => ({
 vi.mock("../src/rpc", () => ({
   exchange: {
     start: async (...args: unknown[]) => {
+      if (state.deny) throw new Error("private access detail");
       state.starts.push(args);
       return { value: {} };
     },
@@ -68,11 +62,11 @@ beforeEach(() => {
   state.scopes.length = 0;
   state.deny = false;
 });
-it("binds child event work to the installed site and retained sharing principal", async () => {
+it("binds Subject updates to the installed site and retained sharing principal", async () => {
   await onJiraChange(
     {
-      eventType: "avi:jira:created:issue",
-      issue: { id: "10044" },
+      eventType: "avi:jira:updated:issue",
+      issue: { id: "10042" },
       atlassianId: "event-actor",
       secret: "private payload",
     },
@@ -89,18 +83,33 @@ it("binds child event work to the installed site and retained sharing principal"
       { installation: { cloudId }, principal: { accountId: "retained-admin" } },
     ],
   ]);
-  expect(state.principals).toEqual(["retained-admin", "retained-admin"]);
+  expect(state.principals).toEqual(["retained-admin"]);
   expect(JSON.stringify(state.log)).not.toMatch(
-    /private payload|event-actor|retained-admin|10044/,
+    /private payload|event-actor|retained-admin|10042/,
   );
 });
-it("never hands off a denied parent read and logs no raw exception", async () => {
-  state.deny = true;
+it("ignores child-only updates without resolving a sharing principal", async () => {
   await onJiraChange(
-    { eventType: "avi:jira:updated:issue", issue: { id: "10044" } },
+    {
+      eventType: "avi:jira:updated:issue",
+      issue: { id: "10044", fields: { parent: { id: "10042" } } },
+    },
     context,
   );
   expect(state.starts).toEqual([]);
+  expect(state.principals).toEqual([]);
+});
+it("reports failed Subject republishing without logging raw exceptions", async () => {
+  state.deny = true;
+  await onJiraChange(
+    { eventType: "avi:jira:updated:issue", issue: { id: "10042" } },
+    context,
+  );
+  expect(state.starts).toEqual([]);
+  expect(state.log).toContainEqual([
+    { attempted: 1, failed: 1 },
+    "workdown.jira-change.completed",
+  ]);
   expect(JSON.stringify(state.log)).not.toContain("private access detail");
 });
 it("does not operate outside development or without trusted installation context", async () => {

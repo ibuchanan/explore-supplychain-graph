@@ -74,7 +74,12 @@ Delivery is backend-first: business Commands specified with OpenRPC, implemented
 ### Refresh, identity, and Publication
 
 - Initiating an Exchange triggers immediate initial generation and delivery. Subsequent freshness is event-driven only. No polling or periodic reconciliation initially.
-- Relevant source events invoke the same application behavior as Command-driven initial publication. Detailed event coverage depends on the Workdown content model and must be specified before implementation.
+- Only updates to the shared Subject Epic itself trigger automatic regeneration
+  through the same application behavior as Command-driven initial publication.
+  Child creation, edits, deletion, and reparenting are explicitly ignored as
+  update reasons (user decision 2026-11-20). Children remain snapshot context,
+  reread on the next Epic update or explicit Exchange start; child-only changes
+  may remain stale indefinitely. Source-Epic deletion remains unsupported.
 - Keep a stable TWG document `id` and assign a monotonically increasing `updateSequenceNumber` per document when changed Workdown is produced. Unchanged content does not create a Publication.
 - Retries preserve identity, sequence, and content. Interpret identity within its Peer Connection/connector context. Exact ID encoding and allocation/concurrency mechanics remain follow-on contract details.
 - Publication has no separate ID or revision system: the document identity and sequence identify the event.

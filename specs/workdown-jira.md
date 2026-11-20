@@ -684,9 +684,13 @@ each behavior, on a deployed site; findings are recorded here. They do not gate
 ticket creation. Verify and document event coverage for:
 
 1. Epic updates affecting any included field, and optional-field mapping changes.
-2. Child creation, edits to included summary fields, deletion, and reparenting.
-   Reparenting must locate both old and new Epics; deletion needs prior parent
-   context. Define how that context is retained when events omit it.
+2. **Child-only changes are not update reasons** (user decision 2026-11-20).
+   Ignore child creation, edits, deletion, and reparenting; neither old nor new
+   Epic is selected from a child event. Children remain snapshot context and
+   are reread on a later Subject-Epic update or explicit `exchange.start`.
+   Their titles/membership may remain stale indefinitely otherwise. Child-event
+   delivery, prior-parent retention, and creation-failure diagnosis are no longer
+   required freshness gates for this profile.
 3. Eligibility changes caused by issue security, project permissions, or sharing
    principal changes. Do not claim these always produce usable Jira events.
 4. Source-Epic deletion, which remains explicitly unsupported by the parent spec.
