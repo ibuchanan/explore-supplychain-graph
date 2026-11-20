@@ -50,7 +50,12 @@ type Receipt = (
   candidate: RetainedDocument,
   binding: Binding,
 ) => Promise<Result<number, string>>;
+export type ExchangeRegistration = Binding & {
+  document: string;
+  accountId: string;
+};
 type Dependencies = PublicationDependencies & {
+  remember?: (registration: ExchangeRegistration) => Promise<void>;
   store: ExchangeStore;
   environment: () => string;
   generate: (
@@ -311,6 +316,16 @@ export function createExchangeCommands(deps: Dependencies) {
         cloudId: context.installation.cloudId,
         connection: params.connection,
       };
+      try {
+        if (typeof context.principal.authorization === "string")
+          await deps.remember?.({
+            ...binding,
+            document,
+            accountId: context.principal.accountId,
+          });
+      } catch {
+        return err("storage-unavailable");
+      }
       const storageKey = key("source", binding, document);
       let candidate: RetainedDocument | undefined;
       try {

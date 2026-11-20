@@ -61,6 +61,48 @@ const defaults = () => ({
 });
 
 describe("Exchange business Commands", () => {
+  it("does not disclose when principal retention fails", async () => {
+    let deliveries = 0;
+    const commands = createExchangeCommands({
+      ...defaults(),
+      remember: async () => {
+        throw new Error("private storage detail");
+      },
+      deliver: async () => {
+        deliveries++;
+        return ok(1);
+      },
+    });
+    expect(await commands.start(params, context)).toEqual({
+      error: "storage-unavailable",
+    });
+    expect(deliveries).toBe(0);
+  });
+  it("retains the authorized sharing principal without retaining the API token", async () => {
+    const registrations: unknown[] = [];
+    const commands = createExchangeCommands({
+      ...defaults(),
+      remember: async (registration) => {
+        registrations.push(registration);
+      },
+    });
+    await commands.start(params, context);
+    await commands.start(params, {
+      ...context,
+      principal: {
+        accountId: "source-admin",
+        authorization: async () => Response.json({}),
+      },
+    });
+    expect(registrations).toEqual([
+      {
+        cloudId: context.installation.cloudId,
+        connection: params.connection,
+        document,
+        accountId: "source-admin",
+      },
+    ]);
+  });
   it("reports acknowledgment storage failure without exposing errors or losing retained content", async () => {
     const store = memory();
     const outcomes: unknown[] = [];

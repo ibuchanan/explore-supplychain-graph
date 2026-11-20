@@ -29,7 +29,16 @@ modules:
         authentication: none
       response:
         type: dynamic
+  trigger:
+    - key: workdown-jira-changes
+      function: jira-change
+      events:
+        - avi:jira:created:issue
+        - avi:jira:updated:issue
+        - avi:jira:deleted:issue
   function:
+    - key: jira-change
+      handler: jira-trigger.onJiraChange
     - key: graph-connection
       handler: graph.onGraphConnectionChange
     - key: sync
@@ -38,10 +47,12 @@ modules:
       handler: index.runAsync
 permissions:
   scopes:
-    - storage:app
-    - write:object:jira
-    - read:object:jira
-    - delete:object:jira
+    storage:app: {}
+    write:object:jira: {}
+    read:object:jira: {}
+    delete:object:jira: {}
+    read:jira-work:
+      allowImpersonation: true
   external:
     fetch:
       backend:

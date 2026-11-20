@@ -474,6 +474,12 @@ handling has local coverage and real REST shape evidence, but still needs the
 secured-Epic and unreadable-Epic installed-app acceptance cases. These
 restrictions do not relax ADR 0002 or declare every classic project verified.
 
+**Ticket 22 local implementation (2026-11-20):** principal retention and offline
+user reads are now implemented, with installed verification still pending. See
+[Jira product event intake](workdown-jira-events.md) for routing, explicit
+freshness limitations, scope review, and remaining approval-gated checks. This
+supersedes the historical statement below that no principal is persisted.
+
 **Republishing decision:** retain the sharing principal's account ID with a
 future Exchange, never the request API token. Every later publication must
 re-read the Epic and complete eligible children under that principal's current

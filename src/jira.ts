@@ -1,5 +1,11 @@
 export type Installation = { cloudId: string; apiBase: string };
-export type Principal = { accountId: string; authorization: string };
+export type JiraReader = (
+  path: string,
+) => Promise<Pick<Response, "status" | "ok" | "json">>;
+export type Principal = {
+  accountId: string;
+  authorization: string | JiraReader;
+};
 export type CommandContext = {
   installation: Installation;
   principal: Principal;
@@ -20,14 +26,16 @@ export function installation(context: {
 
 export const jiraGet = (
   installation: Installation,
-  authorization: string,
+  authorization: string | JiraReader,
   path: string,
 ) =>
-  fetch(`${installation.apiBase}/rest/api/3/${path}`, {
-    headers: { Authorization: authorization, Accept: "application/json" },
-    redirect: "error",
-    signal: AbortSignal.timeout(10_000),
-  });
+  typeof authorization === "function"
+    ? authorization(path)
+    : fetch(`${installation.apiBase}/rest/api/3/${path}`, {
+        headers: { Authorization: authorization, Accept: "application/json" },
+        redirect: "error",
+        signal: AbortSignal.timeout(10_000),
+      });
 
 export async function authenticate(
   authorization: string,

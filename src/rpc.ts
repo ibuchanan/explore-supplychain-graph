@@ -7,6 +7,7 @@ import {
 } from "@forge-ahead/rpc";
 import { commandErrors } from "./command-errors";
 import { createExchangeCommands } from "./exchange";
+import { rememberExchange } from "./exchange-registry";
 import { exchangeStore } from "./exchange-storage";
 import { webPolicy } from "./generated/policy";
 import { inputValidators, outputValidators } from "./generated/validators.js";
@@ -18,8 +19,9 @@ import { exportWorkdown } from "./workdown";
 import { validateWorkdown } from "./workdown-validation";
 
 const logger = createForgeLogger({ name: "workdown", pretty: false });
-const exchange = createExchangeCommands({
+export const exchange = createExchangeCommands({
   store: exchangeStore,
+  remember: rememberExchange,
   environment: () => {
     try {
       return getAppContext().environmentType;
