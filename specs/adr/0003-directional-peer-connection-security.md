@@ -7,7 +7,7 @@ Status: Decided for Explore; implementation and deployed verification pending.
 ## Context
 
 A Forge web trigger has no platform-authenticated caller. Knowing its URL
-allows invocation, not authorization. Ticket 02 proved discovery only; it did
+allows invocation, not authorization. Discovery alone proved only that the endpoint is reachable; it did
 not establish caller identity or trusted runtime installation binding.
 
 Two Site Admins authorize a one-way Connection. Neither a Jira API token used
@@ -76,7 +76,7 @@ Commands, and an admin token cannot substitute for a peer credential.
    fresh operationally authenticated readiness acknowledgment. A bootstrap
    acknowledgment alone is not evidence that the destination is ready.
 
-Invitation import and the one-time bundle result must be covered in the invite-and-inspect Commands'
+Invitation import and the one-time bundle result must be covered in the invite and inspect Commands'
 user-authored contract; acceptance and readiness belong to the accept Command. If the
 proposed contract omits these steps, stop for its update rather than inventing
 an agent-owned method. No UI is required to exercise these Command seams.
@@ -142,7 +142,7 @@ addresses, and arbitrary callback URLs. Authenticate before using any supplied
 callback descriptor. Verify actual generated URL forms and required outbound
 permissions on the existing approved installation; do not substitute a
 permissive wildcard or trust a string suffix check. Verification policy revision
-approved 2026-11-17: a second installation is not a ticket closure prerequisite.
+approved 2026-11-17: a second installation is not a prerequisite for completing any piece of work.
 Actual remote binding and handshake compatibility remain unverified until
 separately exercised; do not enable unverified operational peer traffic or
 weaken any endpoint/authentication check to accommodate single-site testing. SDK-generated
@@ -170,7 +170,7 @@ acceptance, or reactivation. Retain the credential in secret storage only while
 needed for revocation notification/receipt handling (at most ten minutes
 after local revocation), then delete it;
 retain non-secret terminal state. This control-plane exception clarifies the
-later ticket's phrase “no further peer traffic”: it forbids sharing traffic,
+phrase “no further peer traffic” used for revocation: it forbids sharing traffic,
 not the messages needed to stop sharing. It grants no new business feature.
 
 Use the agreed initial attempt plus three retries, nominally after 5, 15, and
@@ -227,8 +227,9 @@ publishing failed. Logs, a no-op publisher, and “event queued” without durab
 acknowledgment are not substitutes. Authentication/authorization failures use
 sanitized reasons and never copy raw requests into the audit sink.
 
-There is currently no app audit publisher. The invite-and-inspect work must supply this adapter
-and test its failure behavior, or remain blocked. Reuse the backbone event and
+There is currently no app audit publisher. No critical Command may ship until
+this adapter exists and its failure behavior (unavailable store, timeout,
+uncertain acknowledgment) is tested. Reuse the backbone event and
 port contracts rather than inventing a second audit protocol. This ADR does
 not claim that console output or an unverified Forge event meets the contract.
 
@@ -272,8 +273,8 @@ message authentication between distinct installations.
 
 ## Implementation and test gates
 
-This documentation-only ticket adds no testable Command or new test seam.
-The invite, accept, and revoke work must use the already approved business Command, JSON-RPC, and
+This ADR adds no testable Command or new test seam.
+Implementing invite, accept, and revoke must use the already approved business Command, JSON-RPC, and
 deployed peer seams, one red/green behavior at a time. Cover wrong admin/site,
 wrong direction, body tampering, expired/replayed invitations and requests,
 conflicting retries, missing audit acknowledgment, terminal-state races, and
@@ -284,8 +285,8 @@ Never bypass installation binding or add test-only production Commands. If a
 peer case cannot enter the real boundary safely on one installation, retain
 local evidence and explicitly mark the remote property unverified. Actual
 inter-installation pairing/transfer is a separate scenario requiring a named
-residual risk, expected signal/cost, and user approval, not a repeated ticket
-closure gate. This changes evidence requirements, not the trust model or
+residual risk, expected signal/cost, and user approval, not a repeated
+completion gate. This changes evidence requirements, not the trust model or
 operational clearance. Never put real bundles or endpoint URLs in fixtures or
 committed evidence.
 
@@ -296,7 +297,7 @@ Required before implementation can be called complete:
   behavior; peer wire encoding and signature examples are approved too.
 - Verify local runtime installation binding, admin authority, SDK URL creation,
   host validation, secret storage, conditional writes, and audit acknowledgment
-  on the first implementation slice that uses each platform behavior.
+  when implementation first uses each platform behavior.
 - Review minimum storage/admin-check scopes and peer egress changes separately;
   deploy, install, or create cloud endpoints only with explicit approval.
 

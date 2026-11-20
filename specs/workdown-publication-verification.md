@@ -1,4 +1,4 @@
-# Ticket 21: Publication implementation and verification
+# Publication implementation and verification
 
 <!-- cspell:words openrpc reingesting workdown Workdown Frontmatter -->
 <!-- cspell:words readback devb stargate webtrigger Rovo -->
@@ -43,7 +43,7 @@ notification envelope; there is no runtime schema compilation.
   retained across content replacement and retried on repeat start, without
   reingesting an already-published sequence. Delivery can repeat after an
   uncertain completion; consumers deduplicate by Connection/document/sequence.
-  Automatic retry scheduling remains ticket 26. To keep pending state bounded,
+  Automatic retry scheduling remains unimplemented follow-on work. To keep pending state bounded,
   a pending older notification is dispatched before acknowledging another
   Publication; newer bytes can still be retained while that consumer fails.
 - The internal dispatcher validates and invokes application handlers. Its
@@ -89,7 +89,7 @@ Existing-site deployed status assertions were added but not run.
 
 The required full check includes tests, typecheck/build, contract freshness,
 format/static checks, Forge lint and bundle size. Its final result is recorded
-on the scratch ticket: **223 tests / 10 files pass**, full check passes, and
+in the local work record: **223 tests / 10 files pass**, full check passes, and
 bundle size is **23.77 kB / 32 kB**. Runtime dependency audit reports six
 moderate and no high/critical advisories; no unrelated dependency upgrades
 were attempted.
@@ -165,7 +165,7 @@ No additional code, scope, deployment, connector reactivation, or ingestion
 retry was performed for this investigation. Another deploy or broadened scope
 is not justified by the current evidence. Next investigation needs the graph
 service's authentication failure reason or a platform trace, without disclosing
-request content or credentials. Ticket remains open.
+request content or credentials. This work remained open.
 
 ### Trace diagnostic and connector review — 2026-11-19 17:43
 
@@ -214,7 +214,7 @@ is still unknown; no available tool here resolves this graph service trace into
 backend authentication logs. No further instrumentation, deployment, scope
 change, or agent ingestion retry was performed. Use this correlation evidence
 for platform investigation, or explicitly approve a controlled invocation-context
-comparison. Ticket remains open.
+comparison. This work remained open.
 
 ## Publication and Rovo Search verified — 2026-11-19
 
@@ -269,12 +269,12 @@ closure gates; they remain unverified rather than newly proven. The app controls
 submission and acknowledgment handling, not Rovo Search feature behavior.
 
 No additional fixture framework, standalone export profile, or destination-local
-viewer is required for ticket 21. The current source-Epic URL remains provisional;
+viewer is required for Publication. The current source-Epic URL remains provisional;
 source-independent viewing and viewer HTML/link safety are not established. Any
 future viewer must satisfy the format specification's security requirements.
 
 The user explicitly deferred deletion API characterization and platform
-connector / document mapping to ticket 28, alongside withdrawal. No deletion was
+connector / document mapping to later withdrawal work. No deletion was
 performed or authorized by that deferral. Real peer delivery remains
 disabled/unverified.
 

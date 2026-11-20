@@ -1,4 +1,4 @@
-# Ticket 20 Exchange Commands
+# Exchange Commands
 
 The user approved the singular method names and contract on 2026-11-19.
 The binding declaration is now [`src/openrpc.json`](../src/openrpc.json).
@@ -218,7 +218,7 @@ was deleted. Live identities and prose remain outside tracked evidence.
   bundle size. No production code or deployed test assertions changed in this
   verification pass. No agent deployment or installation was performed.
 
-The core single-installation loopback flow is cloud verified. Ticket 20's explicit
+The core single-installation loopback flow is cloud verified. The Exchange work's explicit
 **sequence allocation under concurrent changed content** gate remains open;
 unchanged starts do not establish it. First conditional creation was not observed
 from an independently confirmed absent state. Non-admin Project Admin starts and
@@ -277,7 +277,7 @@ credential securely before the write scenario can proceed.
 **209 local tests / 8 files**, Forge lint, freshness/typecheck/build/static/format,
 and **19.95 kB / 32 kB** size check. No deployment or installation was performed.
 
-### Ticket 20 completion — 2026-11-19 15:55
+### Exchange start and read completion — 2026-11-19 15:55
 
 After the user corrected the Keeper value, the same authorized disposable-Epic
 scenario passed on development **4.2.0**: **1 deployed test passed**. No code,
@@ -301,8 +301,8 @@ The earlier credential failure is historical; its exact cause was not diagnosed.
   deployment or installation was performed.
 
 Together with the earlier **4 passed / 2 deferred security skips** installed
-suite and local behavior/security tests, this satisfies ticket 20's explicit
-single-installation Forge-storage sequence gate. **Ticket 20 is complete** under
+suite and local behavior/security tests, this satisfies the Exchange work's explicit
+single-installation Forge-storage sequence gate. **The Exchange start and read work is complete** under
 the approved proportionate-verification policy. This test verifies concurrent
 allocation for a shared changed generation; it does not force a deterministic
 interleaving of different generations. Non-admin cloud credentials, the two

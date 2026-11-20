@@ -37,7 +37,7 @@ capacity; reducing document size alone would not fix pagination/runtime risks.
 | Hot storage key | 12 MB/s reads, 1 MB/s writes per key | Simultaneous updates to one Exchange can hit a hot-key ceiling before app-wide throughput. Conditional transactions protect consistency, not capacity. |
 | Custom entities | 20 entities; 50 attributes and 7 custom indexes per entity | Manifest uses one entity, three attributes, no custom indexes. |
 | TWG ingestion | 1–100 objects/request; 1500 objects/minute/app/tenant for normal ingestion | Publisher sends one object. Children do not count separately. Do not use BACKFILL's 50000/minute allowance as a real-time publication budget. |
-| TWG deletion | 100 external IDs/request; 500 external IDs/minute/app/tenant | Ticket 28 must respect these boundaries and establish the actual connector/document mapping. |
+| TWG deletion | 100 external IDs/request; 500 external IDs/minute/app/tenant | Withdrawal work must respect these boundaries and establish the actual connector/document mapping. |
 | Sequence | TWG uses a long sequence, with greater values treated as newer | App deliberately restricts to positive JavaScript safe integers and refuses allocation after `Number.MAX_SAFE_INTEGER`. No numeric precision expansion is needed. |
 
 ## Local sizing evidence
@@ -85,8 +85,8 @@ value through the local storage adapter. No new deployed boundary test ran.
    before metadata. Repeated full reads/writes matter for rate units and billing.
    No storage refactor or new batching abstraction is introduced by this review.
 3. **No automatic throttling recovery yet.** Current failures must not create
-   false Publications; automatic scheduling/backoff belongs to ticket 26. That
-   ticket must honor platform retry metadata and Jira's independent API limits,
+   false Publications; automatic scheduling/backoff belongs to later retry-policy work. That
+   work must honor platform retry metadata and Jira's independent API limits,
    with bounded attempts rather than sleeping through a short webtrigger budget.
 4. **Capacity is not established.** Maximum Jira response size, worst-case live
    export duration, and TWG acceptance at 256 KiB remain unmeasured. Do not turn

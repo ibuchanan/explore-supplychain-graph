@@ -1,4 +1,4 @@
-# Jira product event intake — ticket 22
+# Jira product event intake
 
 ## Current policy — Epic-only update reasons (2026-11-20)
 
@@ -34,13 +34,12 @@ files**, type checking, Forge lint, build/format/contract checks, and a
 pass Markdown lint. Broader glossary/spec lint still reports existing long
 lines; unrelated formatting and user edits were preserved.
 
-
 ## Historical local implementation (2026-11-20, before Epic-only decision)
 
 This is a development-loopback implementation, not evidence that automatic
 freshness is operational. No deployment, installation, Jira mutation, cloud
 payload capture, or event-driven TWG ingestion was performed for this work.
-Ticket 22 remains open for the installed-platform gates below.
+Republish-on-change remains open for the installed-platform gates below.
 
 Final local verification: `npm run check` passed with **243 tests in 14 files**,
 including Forge lint, type checking/build, generated-contract freshness, static
@@ -111,10 +110,10 @@ No synthetic payload in local tests is claimed as a sanitized cloud fixture.
 - This small development slice scans registered Exchanges and reads retained
   documents; current-parent reads can repeat per Exchange. Large fan-out can
   exhaust invocation budgets. Indexed membership/bounded continuation and the
-  separate ticket 29 request-budget work are not implemented here.
+  separate shared request/deadline-budget work are not implemented here.
 - Permission loss fails fresh generation, but does not withdraw already shared
   content. Source deletion and missed eligibility changes remain unsupported
-  freshness/withdrawal cases; ticket 28 owns the separate withdrawal work.
+  freshness/withdrawal cases; withdrawal is separate, unimplemented work.
 - Automatic republishing is not cleared for operational use until installed
   impersonation, event mapping, and final TWG acknowledgment are verified.
 
@@ -210,7 +209,7 @@ restoration. It is stronger than peer-adapter handoff. It does not establish
 Search indexing latency, external notification consumption, raw event payload
 shape, every included field, child events, reparenting/deletion, permission or
 principal changes, non-contributor impersonation, or actual remote-peer delivery.
-Ticket 22 remains open for those named coverage/decision gates; automatic
+Republish-on-change remains open for those named coverage/decision gates; automatic
 freshness is not generally proven by this one successful scenario.
 
 ## Approved installed child checks — 2026-11-20 10:30–10:32 local

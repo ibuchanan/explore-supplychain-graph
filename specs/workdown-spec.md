@@ -531,7 +531,7 @@ including searches for parent-body phrases, a configured Start date value, and
 included child-title words. On 2026-11-20 the user accepted acknowledgment and
 Search discovery as sufficient ingestion evidence. Additional Search feature
 characterization, exact downstream byte/Frontmatter readback, standalone coverage,
-and measured indexing latency are not ticket 21 closure gates. No Markdown
+and measured indexing latency are not Publication completion gates. No Markdown
 rendering, structured Frontmatter indexing, indexing-time guarantee, or exact
 TWG byte retention is claimed.
 
@@ -539,9 +539,9 @@ There is no destination-local viewer in this backend slice; the Search result
 currently links to the source Epic. This is a provisional navigation limitation,
 not proof of source-independent viewing or viewer HTML/link safety. A future
 viewer must still satisfy this specification's untrusted-content requirements;
-building it is not required to close ticket 21. Deletion API characterization
-and object mapping were explicitly transferred to ticket 28 on 2026-11-20;
-withdrawal is not implemented or verified by ticket 21.
+building it is not required to complete Publication. Deletion API characterization
+and object mapping were explicitly deferred to later withdrawal work on 2026-11-20;
+withdrawal is not implemented or verified by Publication.
 
 The 256 KiB document and 100-child limits remain unchanged and provisional for
 operational capacity after the
