@@ -1,4 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
+import "./audit-runtime";
 import { runAsync, runSync } from "../src/index";
 
 const context = {

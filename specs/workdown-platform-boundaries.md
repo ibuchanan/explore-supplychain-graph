@@ -1,6 +1,6 @@
 # Workdown platform boundaries
 
-<!-- cspell:words Workdown webtrigger multibyte uncontended -->
+<!-- cspell:words Workdown webtrigger multibyte uncontended readback -->
 
 Reviewed 2026-11-20 against current official documentation and the local
 implementation; Jira budget policy and local evidence updated 2026-11-22.
@@ -115,6 +115,72 @@ value through the local storage adapter. No new deployed boundary test ran.
    export duration, and TWG acceptance at 256 KiB remain unmeasured. Do not turn
    a documentation review into an operational-capacity claim. A targeted cloud
    check, if needed for a named risk, requires separate explicit authorization.
+
+## Durable audit storage — approved 2026-11-22
+
+Both webtrigger admission paths use the backbone `AuditPort` adapter in
+`src/audit.ts`. The local publisher stores only the allowlisted backbone
+CloudEvent, using create-only KVS writes at `audit:v1:<event-id>` with a **90-day
+TTL from the first successful write**. Forge namespaces storage by installation
+and environment; records additionally carry the runtime `installationId` and
+unique `environmentId` from `getAppContext()`, never an HTTP-supplied identity.
+Human account IDs come only from Jira-token-authenticated admission; a backend
+impersonation reader is not a human web caller or a Connection account ID.
+Methods must appear in the generated reviewed web policy; phases and reasons
+use the backbone allowlist. Raw requests, exceptions, credentials, and additional
+fields are not persisted.
+
+A successful write is durable acknowledgment. A rejected/uncertain write is
+acknowledged only if readback confirms the identical event and a future
+`EXPIRE_TIME`; conflicting, missing, expired, or unreadable records fail.
+Duplicate readback does not rewrite or refresh TTL. Each emission has a
+**1000 ms acknowledgment bound**, enforced by the backbone: timeout fails a
+critical attempt before its handler runs, but does not cancel a storage request
+already sent. A late write may therefore leave an audit event without a
+corresponding mutation. Outcome failure cannot undo a committed mutation;
+lifecycle-specific outcome recovery remains part of Connection implementation.
+No production method is made critical by this adapter ticket.
+
+Standard methods now emit audit events: a normal exposed Command attempts
+**three storage writes** (authentication, authorization, outcome); a critical
+Command adds a pre-handler attempt write. Discovery and authentication rejection
+normally attempt one. Dispatch rejection can use fewer. Failed writes add one
+readback each; authentication and dispatch currently use separate correlation
+IDs in the backbone. Standard audit failures are best effort, not evidence that
+a record was saved. Missing trusted runtime identity can reject dispatch. There
+is no audit retry queue, new invocation, external service, scope, egress, or
+manifest change. These are operation counts, not measured cloud billing or
+latency. Bundle budget increased from 34 to 35 kB for this adapter (first measured
+bundle 34.41 kB versus prior 33.28 kB); no validation was removed to meet size.
+
+Forge documents asynchronous TTL deletion taking up to **48 hours** after
+expiry, during which reads can still return records. This is not exact-time
+physical erasure, backup erasure, or a tamper-proof ledger. Backend verification
+reads may use `kvs.get(eventKey, { metadataFields: [MetadataField.EXPIRE_TIME] })`
+and must ignore past or invalid expiry metadata. Enumerating records requires a
+bounded, paginated KVS query restricted to the `audit:v1:` prefix with the same
+expiry filtering. No public reader exists. Any future user-facing reader must
+check local Site Admin authority and must never serve peers. Earlier deletion
+is authorized backend maintenance using exact audit keys and `kvs.delete`, not
+a new user Command; routine removal uses TTL, without a cleanup scheduler.
+No new production read/delete helper is introduced solely for tests.
+
+The audit prefix is disjoint from operational-log keys but does not reserve
+platform quota. Operational-log eviction must never delete audit records.
+Quota exhaustion must fail critical attempts closed, not silently drop events.
+Local fake-storage/webtrigger tests establish acknowledgement ordering,
+allowlisting, duplicate/conflict behavior, expiry rejection, and critical
+failure policy. They do not establish cloud atomicity, identity availability,
+TTL enforcement, installed latency, or inter-installation isolation. Deployment
+and installed persistence/fault verification remain pending authorization and a
+safe synthetic critical-path design; no test-only production Command or auth
+bypass is permitted. Until that evidence exists this is local implementation,
+not operational clearance for critical Connection Commands.
+
+Official references checked through Forge documentation search 2026-11-22:
+[KVS partitioning and durability](https://developer.atlassian.com/platform/forge/storage-reference/kvs/),
+[KVS TTL, metadata, and create-only writes](https://developer.atlassian.com/platform/forge/storage-reference/kvs-api/),
+and [trusted runtime identity](https://developer.atlassian.com/platform/forge/runtime-reference/app-context-api/).
 
 ## Allowances are not hard quotas
 

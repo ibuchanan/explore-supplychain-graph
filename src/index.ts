@@ -8,6 +8,7 @@ import {
   createWebtrigger,
   type WebtriggerResponse,
 } from "@forge-ahead/rpc/webtrigger";
+import { audit } from "./audit";
 import { authenticate, authenticateAdmin, installation } from "./jira";
 import { withJiraBudget } from "./jira-budget";
 import { completeDiscovery, options } from "./rpc";
@@ -20,12 +21,14 @@ const errorPolicy = defineLogObjectSummaryPolicy({
 
 const authenticatedHandle = createWebtrigger({
   ...options,
+  audit,
   installation,
   authenticate,
   context: (installation, principal) => ({ installation, principal }),
 });
 const adminHandle = createWebtrigger({
   ...options,
+  audit,
   installation,
   authenticate: authenticateAdmin,
   context: (installation, principal) => ({ installation, principal }),

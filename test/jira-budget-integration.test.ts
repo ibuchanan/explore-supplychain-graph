@@ -9,7 +9,11 @@ const state = vi.hoisted(() => ({
   signals: [] as AbortSignal[],
 }));
 vi.mock("@forge/api", () => ({
-  getAppContext: () => ({ environmentType: "DEVELOPMENT" }),
+  getAppContext: () => ({
+    environmentType: "DEVELOPMENT",
+    installationAri: { installationId: "test-installation" },
+    environmentAri: { environmentId: "test-environment" },
+  }),
   assumeTrustedRoute: (path: string) => path,
   default: {
     asUser: () => ({

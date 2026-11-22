@@ -1,3 +1,4 @@
+import "./audit-runtime";
 import { readFileSync } from "node:fs";
 import { ok } from "@forge-ahead/errors";
 import { createWebDispatcher } from "@forge-ahead/rpc";

@@ -1,3 +1,4 @@
+import "./audit-runtime";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import document from "../src/openrpc.json";
 
