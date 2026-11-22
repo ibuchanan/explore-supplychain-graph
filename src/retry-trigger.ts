@@ -2,10 +2,16 @@ import { getAppContext } from "@forge/api";
 import type { AsyncEvent } from "@forge/events";
 import { registeredExchanges } from "./exchange-registry";
 import { installation } from "./jira";
+import { withJiraBudget } from "./jira-budget";
 import { eventPrincipal } from "./jira-event-adapter";
 import { exchange } from "./rpc";
 
-export async function onRetry(
+export const onRetry = (
+  event: AsyncEvent,
+  context: { installContext?: string },
+) => withJiraBudget(() => handleRetry(event, context));
+
+async function handleRetry(
   event: AsyncEvent,
   context: { installContext?: string },
 ) {

@@ -6,11 +6,12 @@ export function eventPrincipal(accountId: string): Principal {
   return {
     accountId,
     // Paths originate only in our Jira readers, never directly in event payloads.
-    authorization: (path) =>
+    authorization: (path, signal) =>
       api
         .asUser(accountId)
         .requestJira(assumeTrustedRoute(`/rest/api/3/${path}`), {
           headers: { Accept: "application/json" },
+          signal,
         }),
   };
 }

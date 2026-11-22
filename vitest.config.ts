@@ -9,6 +9,7 @@ export default defineConfig({
         : ["**/*.deployed.test.ts"]),
       "**/node_modules/**",
       "**/.agents/**",
+      "**/.claude/**",
       "**/dist/**",
       "**/coverage/**",
       "specs/**",

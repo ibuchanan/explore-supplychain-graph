@@ -1,6 +1,9 @@
+import { checkJiraDeadline, countJiraRequest } from "./jira-budget";
+
 export type Installation = { cloudId: string; apiBase: string };
 export type JiraReader = (
   path: string,
+  signal: AbortSignal,
 ) => Promise<Pick<Response, "status" | "ok" | "json">>;
 export type Principal = {
   accountId: string;
@@ -24,18 +27,48 @@ export function installation(context: {
     : undefined;
 }
 
-export const jiraGet = (
+export async function jiraGet(
   installation: Installation,
   authorization: string | JiraReader,
   path: string,
-) =>
-  typeof authorization === "function"
-    ? authorization(path)
-    : fetch(`${installation.apiBase}/rest/api/3/${path}`, {
-        headers: { Authorization: authorization, Accept: "application/json" },
-        redirect: "error",
-        signal: AbortSignal.timeout(10_000),
-      });
+): Promise<Pick<Response, "status" | "ok" | "json">> {
+  countJiraRequest();
+  const controller = new AbortController();
+  const timer = setTimeout(
+    () => controller.abort(new Error("Jira request timed out")),
+    Math.min(10_000, checkJiraDeadline()),
+  );
+  const aborted = new Promise<never>((_, reject) => {
+    controller.signal.addEventListener(
+      "abort",
+      () => reject(controller.signal.reason),
+      { once: true },
+    );
+  });
+  try {
+    // Keep the timeout active through body consumption, including SDK readers
+    // that do not promptly reject when their AbortSignal is cancelled.
+    const response = await Promise.race([
+      typeof authorization === "function"
+        ? authorization(path, controller.signal)
+        : fetch(`${installation.apiBase}/rest/api/3/${path}`, {
+            headers: {
+              Authorization: authorization,
+              Accept: "application/json",
+            },
+            redirect: "error",
+            signal: controller.signal,
+          }),
+      aborted,
+    ]);
+    if (!response.ok) return response;
+    const data = await Promise.race([response.json(), aborted]);
+    checkJiraDeadline();
+    return { status: response.status, ok: response.ok, json: async () => data };
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export async function authenticate(
   authorization: string,

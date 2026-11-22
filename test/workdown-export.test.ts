@@ -27,7 +27,10 @@ const epic = {
     duedate: null as string | null,
   },
 };
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+});
 
 async function call(
   issue: typeof epic & { fields: Record<string, unknown> } = epic,
@@ -35,7 +38,10 @@ async function call(
   status = 200,
   catalog: unknown[] = [],
   site = cloudId,
-  override?: (url: URL) => Response | undefined,
+  override?: (
+    url: URL,
+    options: RequestInit,
+  ) => Response | Promise<Response> | undefined,
 ) {
   vi.stubGlobal("fetch", async (url: string, options: RequestInit) => {
     expect(options.headers).toMatchObject({
@@ -44,7 +50,7 @@ async function call(
     expect(
       url.startsWith(`https://api.atlassian.com/ex/jira/${site}/rest/api/3/`),
     ).toBe(true);
-    const overridden = override?.(new URL(url));
+    const overridden = override?.(new URL(url), options);
     if (overridden) return overridden;
     if (url.endsWith("/myself"))
       return Response.json({
@@ -99,6 +105,118 @@ async function call(
   expect(response.statusCode).toBe(200);
   return JSON.parse(response.body);
 }
+
+it("shares the 60-request invocation budget across metadata and secured-child pages", async () => {
+  let pages = 0;
+  const result = await call(epic, undefined, 200, [], cloudId, (url) => {
+    if (url.pathname.endsWith("/field/search")) {
+      const startAt = Number(url.searchParams.get("startAt"));
+      return Response.json({
+        startAt,
+        total: 20,
+        isLast: startAt === 19,
+        values: [{ id: `field_${startAt}`, stableId: `field:${startAt}` }],
+      });
+    }
+    if (url.pathname.endsWith("/search/jql")) {
+      pages++;
+      return Response.json({
+        isLast: pages === 100,
+        ...(pages < 100 ? { nextPageToken: `page-${pages}` } : {}),
+        issues: [{ fields: { security: { id: "7" } } }],
+      });
+    }
+    return undefined;
+  });
+  expect(result).toMatchObject({ error: { code: -32007 } });
+  expect(result).not.toHaveProperty("result");
+  // 2 admission + 1 Subject + 20 catalog + 1 server + 36 child requests.
+  expect(pages).toBe(36);
+  expect(await call()).toHaveProperty("result");
+});
+
+it("stops metadata pagination at 35 seconds including admission time", async () => {
+  vi.useFakeTimers();
+  let pages = 0;
+  const result = await call(epic, undefined, 200, [], cloudId, (url) => {
+    if (url.pathname.endsWith("/myself")) vi.advanceTimersByTime(7_000);
+    if (url.pathname.endsWith("/field/search")) {
+      const startAt = pages++;
+      vi.advanceTimersByTime(7_000);
+      return Response.json({
+        startAt,
+        total: 10,
+        isLast: startAt === 9,
+        values: [{ id: `field_${startAt}`, stableId: `field:${startAt}` }],
+      });
+    }
+    return undefined;
+  });
+  expect(result).toMatchObject({ error: { code: -32004 } });
+  expect(result).not.toHaveProperty("result");
+  expect(pages).toBe(4);
+});
+
+it("cancels a stalled child response body when only 2 seconds remain", async () => {
+  vi.useFakeTimers();
+  let signal: AbortSignal | undefined;
+  let entered!: () => void;
+  const reading = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const pending = call(epic, undefined, 200, [], cloudId, (url, options) => {
+    if (url.pathname.endsWith("/search/jql")) {
+      signal = options.signal ?? undefined;
+      // Previous completed calls consume the invocation's time, not this call's timeout.
+      const body = new ReadableStream({
+        start() {
+          entered();
+        },
+      });
+      return new Response(body);
+    }
+    vi.advanceTimersByTime(6_600);
+    return undefined;
+  });
+  await reading;
+  const observed = pending.then((result) => ({ result }));
+  await vi.advanceTimersByTimeAsync(2_000);
+  expect(signal?.aborted).toBe(true);
+  expect(await observed).toMatchObject({ result: { error: { code: -32007 } } });
+});
+
+it("rejects a document whose rendering crosses the invocation deadline", async () => {
+  vi.useFakeTimers();
+  const result = await call(epic, undefined, 200, [], cloudId, (url) => {
+    if (!url.pathname.endsWith("/search/jql")) return;
+    const response = Response.json({ isLast: true, issues: [] });
+    const json = response.json.bind(response);
+    Object.defineProperty(response, "json", {
+      value: async () => {
+        const page = await json();
+        Object.defineProperty(page, "issues", {
+          get() {
+            vi.advanceTimersByTime(20_000);
+            return [];
+          },
+        });
+        return page;
+      },
+    });
+    return response;
+  });
+  expect(result).toMatchObject({ error: { code: -32007 } });
+  expect(result).not.toHaveProperty("result");
+});
+
+it("reports unreadable site metadata without returning a partial document", async () => {
+  const result = await call(epic, undefined, 200, [], cloudId, (url) => {
+    if (url.pathname.endsWith("/serverInfo"))
+      throw new Error("Jira deadline exhausted");
+    return undefined;
+  });
+  expect(result).toMatchObject({ error: { code: -32004 } });
+});
 
 const startField = {
   id: "customfield_20017",

@@ -3,8 +3,9 @@
 <!-- cspell:words Workdown webtrigger multibyte uncontended -->
 
 Reviewed 2026-11-20 against current official documentation and the local
-implementation. This is a documentation and local-sizing review, not a deployed
-capacity test, cost forecast, or permission to change the architecture.
+implementation; Jira budget policy and local evidence updated 2026-11-22.
+This is not a deployed capacity test, cost forecast, or permission to change
+the architecture.
 
 ## Findings and policy
 
@@ -62,20 +63,42 @@ value through the local storage adapter. No new deployed boundary test ran.
 
 ## Remaining app-controlled risks
 
-1. **Invocation-wide request/time budget is missing.** `jiraGet` has a 10-second
-   per-call timeout, not a shared deadline. `start-date.ts` permits up to 1000
-   pages in the initial site catalog scan. The user-approved 2026-11-20 change
-   replaces the second full project scan with an exact-ID/project-filtered query;
-   a conforming response needs only one page. Local regression verifies the query;
-   the authorized installed discovery/export check passed three tests on
-   2026-11-20, without capturing live request counts. `readChildren` detects
-   repeated page tokens but has no total-page ceiling; secured children do not
-   count against the eligible-child cap. Valid unique-token pagination can exhaust
-   the 55-second or 100-egress-request budget before a controlled error returns.
-   Add a shared request/deadline budget with fail-whole behavior in a separately
-   approved implementation slice; never truncate or disclose excluded children.
-   On 2026-11-20 the user accepted this as a non-blocking hardening follow-up,
-   allowing the ingestion slice to close without claiming this gap is fixed.
+1. **Jira work is bounded locally; cloud capacity remains unverified.** The
+   2026-11-22 approved policy admits at most **60 Jira requests per invocation**,
+   including authentication, permission checks, metadata pages and child pages.
+   One invocation-local, monotonic deadline starts at handler entry: **35 seconds**
+   for webtriggers and retry consumers, **15 seconds** for Jira product events.
+   Nested work and multiple Exchanges share the same budget. Secured children
+   remain excluded but their pages consume requests. Each Jira transport and
+   successful JSON body read is bounded by the smaller of **10 seconds** and
+   remaining time; both caller-token fetch and impersonated `requestJira` receive
+   cancellation signals. Generation checks expiry before returning a document.
+   Initial global stable-ID discovery and exact-ID/project filtering are unchanged;
+   exhaustion fails whole rather than treating a partial catalog as absence.
+
+   Existing errors are retained: admission failure is HTTP 503; Project Admin
+   verification remains fail-closed Forbidden; Subject reads use Eligibility
+   undetermined; field and site metadata use Field unreadable; child reads or
+   final-generation expiry use Children unreadable. No OpenRPC changes, retry
+   sleeps, new queues, caching, or persistent budget state were introduced.
+
+   Local fake-time HTTP/Command and event-handler tests establish combined page
+   exhaustion, ordinary success, fresh invocation isolation, stalled transport/body
+   cancellation, final-generation expiry, and preservation of retained source,
+   destination and Publication state on a failed refresh. Retry-handler evidence
+   includes refusing Jira reads after registration lookup consumes its deadline.
+   These are application-policy checks, not a Forge capacity or deployed
+   cancellation test. The live official invocation limits were rechecked on
+   2026-11-22: webtriggers allow 55 seconds; ordinary product events allow 25;
+   async consumers default to 55; undeclared-timeout functions allow 100 egress
+   requests, excluding `requestJira`/`requestConfluence`.
+
+   The policy reserves 20 seconds after webtrigger Jira work and 10 after product
+   event Jira work. It does **not** time out storage/ingestion, bound SDK-internal
+   requests, preempt synchronous CPU work or guarantee cancellation of remote
+   work already sent. Large response parsing, registration lookup, storage,
+   delivery, ingestion and contention can still overrun the platform invocation.
+   No deployment, live capacity check or scope/egress change accompanied this work.
 2. **Storage amplification.** A consistent retained read uses metadata, four
    chunks, then metadata again: six reads per uncontended attempt, up to three
    attempts. Source and destination retain separate records even in loopback.
@@ -85,8 +108,8 @@ value through the local storage adapter. No new deployed boundary test ran.
    before metadata. Repeated full reads/writes matter for rate units and billing.
    No storage refactor or new batching abstraction is introduced by this review.
 3. **No automatic throttling recovery yet.** Current failures must not create
-   false Publications; automatic scheduling/backoff belongs to later retry-policy work. That
-   work must honor platform retry metadata and Jira's independent API limits,
+   false Publications; automatic scheduling/backoff belongs to retry-policy work.
+   That work must honor platform retry metadata and Jira's independent API limits,
    with bounded attempts rather than sleeping through a short webtrigger budget.
 4. **Capacity is not established.** Maximum Jira response size, worst-case live
    export duration, and TWG acceptance at 256 KiB remain unmeasured. Do not turn

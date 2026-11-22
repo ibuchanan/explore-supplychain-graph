@@ -1,6 +1,7 @@
 import { err, ok } from "@forge-ahead/errors";
 import type { HandlerMap } from "./generated/contract";
 import { type CommandContext, jiraGet } from "./jira";
+import { checkJiraDeadline } from "./jira-budget";
 import { resolveStartDate } from "./start-date";
 import {
   type Child,
@@ -9,7 +10,6 @@ import {
   escapeMarkdown,
   readChildren,
 } from "./workdown-children";
-
 import { descriptionText } from "./workdown-description";
 
 const quote = JSON.stringify;
@@ -183,13 +183,18 @@ export const exportWorkdown: HandlerMap<
       return err("field-unreadable");
     }
   }
-  const server = await jiraGet(
-    installation,
-    principal.authorization,
-    "serverInfo",
-  );
-  if (!server.ok) return err("internal-error");
-  const { baseUrl } = (await server.json()) as { baseUrl: string };
+  let baseUrl: string;
+  try {
+    const server = await jiraGet(
+      installation,
+      principal.authorization,
+      "serverInfo",
+    );
+    if (!server.ok) return err("field-unreadable");
+    ({ baseUrl } = (await server.json()) as { baseUrl: string });
+  } catch {
+    return err("field-unreadable");
+  }
   if (
     !/^\d+$/.test(issue.id) ||
     typeof issue.key !== "string" ||
@@ -263,5 +268,10 @@ export const exportWorkdown: HandlerMap<
   ].join("\n");
   if (Buffer.byteLength(document, "utf8") > 262144)
     return err("document-too-large");
+  try {
+    checkJiraDeadline();
+  } catch {
+    return err("children-unreadable");
+  }
   return ok(document);
 };

@@ -2,13 +2,19 @@ import { getAppContext } from "@forge/api";
 import { createForgeLogger } from "@forge-ahead/logging";
 import { registeredExchanges } from "./exchange-registry";
 import { installation } from "./jira";
+import { withJiraBudget } from "./jira-budget";
 import { eventPrincipal } from "./jira-event-adapter";
 import { createJiraEventHandler } from "./jira-events";
 import { exchange } from "./rpc";
 
 const logger = createForgeLogger({ name: "workdown", pretty: false });
 
-export async function onJiraChange(
+export const onJiraChange = (
+  event: unknown,
+  context: { installContext?: string },
+) => withJiraBudget(() => handleJiraChange(event, context), 15_000);
+
+async function handleJiraChange(
   event: unknown,
   context: { installContext?: string },
 ) {

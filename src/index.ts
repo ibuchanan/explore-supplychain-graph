@@ -9,6 +9,7 @@ import {
   type WebtriggerResponse,
 } from "@forge-ahead/rpc/webtrigger";
 import { authenticate, authenticateAdmin, installation } from "./jira";
+import { withJiraBudget } from "./jira-budget";
 import { completeDiscovery, options } from "./rpc";
 
 const logger = createForgeLogger({ name: "workdown", pretty: false });
@@ -69,7 +70,7 @@ export const runSync: typeof handle = async (request, context) =>
   withLogContext({ operation: "webtrigger", requestId: randomUUID() }, () =>
     logger.invocation(
       { eventType: "webtrigger" },
-      () => handle(request, context),
+      () => withJiraBudget(() => handle(request, context)),
       {
         successMessage: "workdown.rpc.completed",
         errorMessage: "workdown.rpc.failed",
