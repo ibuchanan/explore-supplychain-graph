@@ -16,27 +16,29 @@ vi.mock("@forge/api", () => ({
 vi.mock("@forge/kvs", () => ({
   MetadataField: { EXPIRE_TIME: "EXPIRE_TIME" },
   kvs: {
-    async set(
-      key: string,
-      value: unknown,
-      options: { keyPolicy: string; ttl: { value: number; unit: string } },
-    ) {
-      if (state.pending) await state.pending;
-      if (state.fail) throw new Error("private storage failure");
-      if (options.keyPolicy === "FAIL_IF_EXISTS" && state.records.has(key))
-        throw new Error("exists");
-      expect(options.ttl).toEqual({ value: 90, unit: "DAYS" });
-      state.records.set(key, {
-        value: structuredClone(value),
-        expireTime: new Date(Date.now() + 90 * 86400000).toISOString(),
-      });
-      if (state.afterCommit) throw new Error("acknowledgment lost");
-    },
-    async get(key: string) {
-      if (state.readFail) throw new Error("readback unavailable");
-      if (state.fail) throw new Error("private read failure");
-      return structuredClone(state.records.get(key));
-    },
+    entity: () => ({
+      async set(
+        key: string,
+        value: unknown,
+        options: { keyPolicy: string; ttl: { value: number; unit: string } },
+      ) {
+        if (state.pending) await state.pending;
+        if (state.fail) throw new Error("private storage failure");
+        if (options.keyPolicy === "FAIL_IF_EXISTS" && state.records.has(key))
+          throw new Error("exists");
+        expect(options.ttl).toEqual({ value: 90, unit: "DAYS" });
+        state.records.set(key, {
+          value: structuredClone(value),
+          expireTime: new Date(Date.now() + 90 * 86400000).toISOString(),
+        });
+        if (state.afterCommit) throw new Error("acknowledgment lost");
+      },
+      async get(key: string) {
+        if (state.readFail) throw new Error("readback unavailable");
+        if (state.fail) throw new Error("private read failure");
+        return structuredClone(state.records.get(key));
+      },
+    }),
   },
 }));
 
@@ -72,7 +74,11 @@ it.each([runSync, runAsync])(
     const response = await handler(request(), forgeContext);
     expect(response.statusCode).toBe(200);
     expect(JSON.parse(response.body).result.openrpc).toBeDefined();
-    expect([...state.records.values()].map(({ value }) => value)).toEqual([
+    expect(
+      [...state.records.values()].map(
+        ({ value }) => (value as { event: unknown }).event,
+      ),
+    ).toEqual([
       expect.objectContaining({
         type: "com.forge-ahead.rpc.authentication",
         data: expect.objectContaining({
@@ -121,7 +127,7 @@ it("fails closed before a critical handler when durable audit is unavailable or 
   const handler = vi.fn(async () => {
     expect(
       [...state.records.values()].map(
-        ({ value }) => (value as typeof event).type,
+        ({ value }) => (value as { event: typeof event }).event.type,
       ),
     ).toContain("com.forge-ahead.rpc.attempt");
     return ok({});
@@ -167,7 +173,7 @@ it("fails closed before a critical handler when durable audit is unavailable or 
   expect(handler).toHaveBeenCalledOnce();
   expect(
     [...state.records.values()].map(
-      ({ value }) => (value as typeof event).type,
+      ({ value }) => (value as { event: typeof event }).event.type,
     ),
   ).toEqual([
     "com.forge-ahead.rpc.authentication",
@@ -248,14 +254,18 @@ it("confirms a committed write after lost acknowledgment but refuses unavailable
   await expect(audit.publish(event)).resolves.toBeUndefined();
   state.readFail = true;
   await expect(audit.publish({ ...event, id: "event-2" })).rejects.toThrow();
-  expect(state.records.has("audit:v1:event-2")).toBe(true);
+  expect(state.records.has("audit:event-2")).toBe(true);
 });
 
 it("stores bounded rejection reasons without a fabricated human or unknown method", async () => {
   const missing = request();
   delete (missing.headers as Record<string, string[]>)["Authorization"];
   expect((await runSync(missing, forgeContext)).statusCode).toBe(401);
-  expect([...state.records.values()].map(({ value }) => value)).toEqual([
+  expect(
+    [...state.records.values()].map(
+      ({ value }) => (value as { event: unknown }).event,
+    ),
+  ).toEqual([
     expect.objectContaining({
       data: expect.objectContaining({ reason: "invalid-credentials" }),
     }),
@@ -288,17 +298,17 @@ it("stores bounded rejection reasons without a fabricated human or unknown metho
 
 it("acknowledges identical duplicates without extending retention and rejects conflicts", async () => {
   await audit.publish(event);
-  const stored = structuredClone(state.records.get("audit:v1:event-1"));
+  const stored = structuredClone(state.records.get("audit:event-1"));
   await expect(audit.publish(event)).resolves.toBeUndefined();
   await expect(
     audit.publish({ ...event, data: { ...event.data, reason: "failed" } }),
   ).rejects.toThrow();
-  expect(state.records.get("audit:v1:event-1")).toEqual(stored);
+  expect(state.records.get("audit:event-1")).toEqual(stored);
 });
 
 it("does not acknowledge expired records still returned during asynchronous deletion", async () => {
   await audit.publish(event);
-  const stored = state.records.get("audit:v1:event-1");
+  const stored = state.records.get("audit:event-1");
   if (!stored) throw new Error("Missing fixture");
   stored.expireTime = new Date(Date.now() - 1).toISOString();
   await expect(audit.publish(event)).rejects.toThrow();
@@ -325,5 +335,5 @@ it("acknowledges only after storing an allowlisted event with 90-day expiry", as
   release();
   await publishing;
   expect(acknowledged).toBe(true);
-  expect(state.records.get("audit:v1:event-1")?.value).toEqual(event);
+  expect(state.records.get("audit:event-1")?.value).toMatchObject({ event });
 });

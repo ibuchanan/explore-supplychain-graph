@@ -24,5 +24,10 @@ export const webPolicy = {
     "web": true,
     "execution": "asApp",
     "audit": "standard"
+  },
+  "logs.list": {
+    "web": true,
+    "execution": "asApp",
+    "audit": "standard"
   }
 } as const;

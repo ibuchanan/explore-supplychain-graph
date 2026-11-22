@@ -4,12 +4,16 @@ import { registeredExchanges } from "./exchange-registry";
 import { installation } from "./jira";
 import { withJiraBudget } from "./jira-budget";
 import { eventPrincipal } from "./jira-event-adapter";
+import { withOperationalLogs } from "./logging";
 import { exchange } from "./rpc";
 
 export const onRetry = (
   event: AsyncEvent,
   context: { installContext?: string },
-) => withJiraBudget(() => handleRetry(event, context));
+) =>
+  withOperationalLogs(() =>
+    withJiraBudget(() => handleRetry(event, context), 34_750),
+  );
 
 async function handleRetry(
   event: AsyncEvent,

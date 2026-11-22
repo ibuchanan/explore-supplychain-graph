@@ -1,6 +1,6 @@
 import { getAppContext } from "@forge/api";
 import { Queue } from "@forge/events";
-import { createForgeLogger } from "@forge-ahead/logging";
+import { logger } from "./logging";
 import {
   createWebDispatcher,
   type OpenRpcDocument,
@@ -15,11 +15,11 @@ import { inputValidators, outputValidators } from "./generated/validators.js";
 import { dispatchPublication, ingestWorkdown } from "./graph";
 import type { CommandContext } from "./jira";
 import { isProjectAdmin } from "./jira";
+import { listLogs } from "./logs";
 import document from "./openrpc.json";
 import { exportWorkdown } from "./workdown";
 import { validateWorkdown } from "./workdown-validation";
 
-const logger = createForgeLogger({ name: "workdown", pretty: false });
 const retryQueue = new Queue({ key: "workdown-retries" });
 export const exchange = createExchangeCommands({
   store: exchangeStore,
@@ -48,6 +48,8 @@ export const exchange = createExchangeCommands({
   },
   reportPublication: (stage, outcome) =>
     logger.info({ stage, outcome }, "workdown.publication"),
+  reportPublicationSummary: (stage, outcome) =>
+    logger.info({ stage, outcome }, "workdown.publication.summary"),
 });
 
 export const options: WebOptions<CommandContext> = {
@@ -59,6 +61,7 @@ export const options: WebOptions<CommandContext> = {
     "document.get": exchange.get,
     "publication.status": exchange.status,
     "exchange.status": exchange.sourceStatus,
+    "logs.list": listLogs,
   },
   inputValidators,
   outputValidators: {
@@ -73,6 +76,7 @@ export const options: WebOptions<CommandContext> = {
     "exchange.status": "asUser",
     "document.get": "asApp",
     "publication.status": "asApp",
+    "logs.list": "asApp",
   }),
   authorize: () => true,
   // The handler uses the same Jira-verified credential, never Forge impersonation.

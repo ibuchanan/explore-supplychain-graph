@@ -78,7 +78,7 @@
     {
       "name": "Forge app bundle",
       "path": "dist/**/*.js",
-      "limit": "35 kB"
+      "limit": "45 kB"
     }
   ]
 }

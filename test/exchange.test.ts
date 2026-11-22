@@ -188,6 +188,25 @@ describe("Exchange business Commands", () => {
       value: { ...read, loopback: true, updateSequenceNumber: 1, workdown },
     });
   });
+  it("reports publication summary only after durable destination stage status persistence", async () => {
+    const summaries: unknown[] = [];
+    const commands = createExchangeCommands({
+      ...defaults(),
+      ingest: async () => true,
+      notificationEnabled: false,
+      reportPublicationSummary: (stage, outcome) =>
+        summaries.push({ stage, outcome }),
+    });
+
+    await expect(commands.start(params, context)).resolves.toMatchObject({
+      value: { document, updateSequenceNumber: 1 },
+    });
+    await expect(commands.start(params, context)).resolves.toMatchObject({
+      value: { document, updateSequenceNumber: 1 },
+    });
+
+    expect(summaries).toEqual([{ stage: "ingestion", outcome: "succeeded" }]);
+  });
   it("does not publish a superseded acknowledgment or regress the latest retained sequence", async () => {
     let release = () => {};
     const gate = new Promise<void>((resolve) => {

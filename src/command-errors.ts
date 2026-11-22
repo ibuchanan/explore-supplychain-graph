@@ -29,4 +29,5 @@ export const commandErrors = {
   "delivery-unconfirmed": { title: "Delivery unconfirmed", code: -32011 },
   "storage-unavailable": { title: "Storage unavailable", code: -32012 },
   "document-unavailable": { title: "Document unavailable", code: -32013 },
+  "logs-unavailable": { title: "Logs unavailable", code: -32014 },
 } as const satisfies Record<string, CatalogProblemDefinition>;

@@ -161,6 +161,7 @@ describe("application Command contract", () => {
       "document.get",
       "exchange.status",
       "publication.status",
+      "logs.list",
     ]);
   });
 

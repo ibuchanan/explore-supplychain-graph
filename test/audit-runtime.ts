@@ -15,11 +15,14 @@ vi.mock("@forge/kvs", async (original) => {
   return {
     ...actual,
     kvs: Object.assign(Object.create(actual.kvs), {
-      async set(key: string, value: unknown) {
-        if (!key.startsWith("audit:v1:"))
-          throw new Error("Unexpected KVS write");
-        if (records.has(key)) throw new Error("Duplicate audit ID");
-        records.set(key, structuredClone(value));
+      entity(name: string) {
+        if (name !== "log-event") throw Error("Unexpected entity");
+        return {
+          async set(key: string, value: unknown) {
+            if (records.has(key)) throw new Error("Duplicate event ID");
+            records.set(key, structuredClone(value));
+          },
+        };
       },
     }),
   };

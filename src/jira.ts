@@ -116,8 +116,9 @@ export async function authenticateAdmin(
   const data = (await permissions.json()) as {
     permissions?: { ADMINISTER?: { havePermission?: unknown } };
   };
-  if (data.permissions?.ADMINISTER?.havePermission !== true)
-    return { kind: "forbidden" as const };
+  const allowed = data.permissions?.ADMINISTER?.havePermission;
+  if (typeof allowed !== "boolean") return { kind: "unavailable" as const };
+  if (!allowed) return { kind: "forbidden" as const };
   return identity;
 }
 

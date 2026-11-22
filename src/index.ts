@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import {
-  createForgeLogger,
   defineLogObjectSummaryPolicy,
   withLogContext,
 } from "@forge-ahead/logging";
@@ -11,9 +10,9 @@ import {
 import { audit } from "./audit";
 import { authenticate, authenticateAdmin, installation } from "./jira";
 import { withJiraBudget } from "./jira-budget";
+import { logger, withOperationalLogs } from "./logging";
 import { completeDiscovery, options } from "./rpc";
 
-const logger = createForgeLogger({ name: "workdown", pretty: false });
 const errorPolicy = defineLogObjectSummaryPolicy({
   kind: "invocationError",
   fields: {},
@@ -40,7 +39,8 @@ const handle: typeof adminHandle = async (request, context) => {
   } catch {
     /* Malformed requests retain the existing admin admission policy. */
   }
-  const response = await (method === "exchange.start" ||
+  const response = await (method === "logs.list" ||
+    method === "exchange.start" ||
     method === "exchange.status" ||
     method === "document.get" ||
     method === "publication.status"
@@ -70,16 +70,18 @@ function summarizeResponse(
 }
 
 export const runSync: typeof handle = async (request, context) =>
-  withLogContext({ operation: "webtrigger", requestId: randomUUID() }, () =>
-    logger.invocation(
-      { eventType: "webtrigger" },
-      () => withJiraBudget(() => handle(request, context)),
-      {
-        successMessage: "workdown.rpc.completed",
-        errorMessage: "workdown.rpc.failed",
-        errorPolicy,
-        summarizeResult: summarizeResponse,
-      },
+  withOperationalLogs(() =>
+    withLogContext({ operation: "webtrigger", requestId: randomUUID() }, () =>
+      logger.invocation(
+        { eventType: "webtrigger" },
+        () => withJiraBudget(() => handle(request, context), 34_750),
+        {
+          successMessage: "workdown.rpc.completed",
+          errorMessage: "workdown.rpc.failed",
+          errorPolicy,
+          summarizeResult: summarizeResponse,
+        },
+      ),
     ),
   );
 

@@ -64,6 +64,26 @@ permissions:
 app:
   storage:
     entities:
+      - name: log-event
+        attributes:
+          kind:
+            type: string
+          timeKey:
+            type: string
+          eventType:
+            type: string
+          correlationId:
+            type: string
+          expiresAt:
+            type: string
+          event:
+            type: any
+        indexes:
+          - name: by-kind-time
+            partition:
+              - kind
+            range:
+              - timeKey
       - name: exchange-document
         attributes:
           revision:

@@ -105,6 +105,7 @@ describe("discovery dispatcher", () => {
       "document.get",
       "exchange.status",
       "publication.status",
+      "logs.list",
     ]);
   });
 });

@@ -65,6 +65,10 @@ type PublicationDependencies = {
       | "notification-storage",
     outcome: "recorded" | "conflict" | "exception",
   ) => void;
+  reportPublicationSummary?: (
+    stage: "ingestion" | "notification",
+    outcome: "succeeded" | "failed",
+  ) => void;
 };
 type Receipt = (
   candidate: RetainedDocument,
@@ -330,6 +334,7 @@ async function runDestination(
       deps.reportPublication?.("acknowledgment-storage", "conflict");
       return false;
     }
+    deps.reportPublicationSummary?.(stage, succeeded ? "succeeded" : "failed");
     record = (await store.read(storageKey)) ?? next;
     if (!succeeded && only !== stage)
       await scheduleStage(deps, status, {
