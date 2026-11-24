@@ -1,4 +1,11 @@
 modules:
+  jira:adminPage:
+    - key: workdown-logs
+      title: Workdown logs
+      resource: log-viewer
+      render: native
+      resolver:
+        function: log-resolver
   graph:connector:
     - key: workdown-documents
       name: Workdown
@@ -39,6 +46,8 @@ modules:
       queue: workdown-retries
       function: retry
   function:
+    - key: log-resolver
+      handler: log-resolver.handler
     - key: retry
       handler: retry-trigger.onRetry
     - key: jira-change
@@ -49,9 +58,13 @@ modules:
       handler: index.runSync
     - key: async
       handler: index.runAsync
+resources:
+  - key: log-viewer
+    path: src/frontend.tsx
 permissions:
   scopes:
     storage:app: {}
+    read:jira-user: {}
     write:object:jira: {}
     read:object:jira: {}
     delete:object:jira: {}

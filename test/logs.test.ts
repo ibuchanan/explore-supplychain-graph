@@ -174,7 +174,7 @@ describe("logs.list reader", () => {
       vi.fn(async (url: string, init?: RequestInit) => {
         const auth =
           init?.headers && "Authorization" in init.headers
-            ? init.headers.Authorization
+            ? init.headers["Authorization"]
             : undefined;
         if (url.endsWith("/myself"))
           return jsonResponse({
@@ -232,8 +232,69 @@ describe("logs.list reader", () => {
         { kind: "audit" },
         context(async () => jsonResponse({})),
       ),
-    ).resolves.toEqual({ error: "logs-unavailable" });
+    ).resolves.toEqual({ error: "forbidden" });
     expect(queryCalls).toHaveLength(0);
+  });
+
+  it("accepts a trusted session reader only after fresh human identity and admin checks", async () => {
+    const { listLogs } = await import("../src/logs");
+    const reader = vi.fn(async (path: string) =>
+      jsonResponse(
+        path === "myself"
+          ? { accountId: "admin", active: true, accountType: "atlassian" }
+          : { permissions: { ADMINISTER: { havePermission: true } } },
+      ),
+    );
+    rows.push(
+      stored("audit", auditEvent("session", "2026-11-22T10:00:00.000Z")),
+    );
+    await expect(
+      listLogs({ kind: "audit" }, context(reader)),
+    ).resolves.toMatchObject({
+      value: { events: [auditEvent("session", "2026-11-22T10:00:00.000Z")] },
+    });
+    expect(reader.mock.calls.map(([path]) => path)).toEqual([
+      "myself",
+      "mypermissions?permissions=ADMINISTER",
+    ]);
+  });
+
+  it("rechecks session authority for continuations and rejects identity mismatch before storage", async () => {
+    const { listLogs } = await import("../src/logs");
+    let allowed = true;
+    let accountId = "admin";
+    const reader = async (path: string) =>
+      jsonResponse(
+        path === "myself"
+          ? { accountId, active: true, accountType: "atlassian" }
+          : { permissions: { ADMINISTER: { havePermission: allowed } } },
+      );
+    nextCursor = "session-page";
+    const first = await listLogs({ kind: "audit" }, context(reader));
+    if (!first.isOk() || !first.value.nextCursor)
+      throw new Error("Missing cursor");
+    const calls = queryCalls.length;
+    allowed = false;
+    await expect(
+      listLogs(
+        { kind: "audit", cursor: first.value.nextCursor },
+        context(reader),
+      ),
+    ).resolves.toEqual({ error: "forbidden" });
+    allowed = true;
+    accountId = "other";
+    await expect(listLogs({ kind: "audit" }, context(reader))).resolves.toEqual(
+      { error: "forbidden" },
+    );
+    await expect(
+      listLogs(
+        { kind: "audit" },
+        context(async () => {
+          throw new Error("private");
+        }),
+      ),
+    ).resolves.toEqual({ error: "logs-unavailable" });
+    expect(queryCalls).toHaveLength(calls);
   });
 
   it("validates retained UTC bounds semantically", async () => {

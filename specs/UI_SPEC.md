@@ -1,6 +1,6 @@
 # UI Specification: Demonstration UI for Supplychain Graph Logs
 
-**Status:** Draft for user editing; not approved for implementation.
+**Status:** Approved for implementation by the user on 2026-11-23; ticket 41 implementation in progress.
 
 ## 1. Strategy & Scope
 
@@ -96,7 +96,7 @@ Time (UTC)                 Event
 
 ### Interaction Flow
 
-1.  Opening the page selects Audit
+1.  Opening the page selects Operational
     and captures a fixed time window from now minus one hour to now.
     Request up to 20 candidates through `logs.list`,
     with explicit canonical UTC `from` and `to` bounds
@@ -324,4 +324,4 @@ without expanding this proof surface into an operations product.
 - `src/logs.ts` (current reader and authorization boundary)
 - `manifest.yml` (current modules and permissions)
 - `.agents/skills/to-ui-spec/references/about-atlassian-design-system.md`
-- `UI_SPEC.md` (this draft; pending user editing and approval)
+- `UI_SPEC.md` (approved by the user on 2026-11-23)

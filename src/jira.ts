@@ -71,13 +71,16 @@ export async function jiraGet(
 }
 
 export async function authenticate(
-  authorization: string,
+  authorization: string | JiraReader,
   installation: Installation,
 ): Promise<
   | { kind: "authenticated"; principal: Principal }
   | { kind: "unauthorized" | "forbidden" | "unavailable" }
 > {
-  if (!/^Basic [A-Za-z0-9+/]+={0,2}$/.test(authorization))
+  if (
+    typeof authorization === "string" &&
+    !/^Basic [A-Za-z0-9+/]+={0,2}$/.test(authorization)
+  )
     return { kind: "unauthorized" as const };
   const response = await jiraGet(installation, authorization, "myself");
   if (response.status === 401) return { kind: "unauthorized" as const };
@@ -102,7 +105,7 @@ export async function authenticate(
 }
 
 export async function authenticateAdmin(
-  authorization: string,
+  authorization: string | JiraReader,
   installation: Installation,
 ) {
   const identity = await authenticate(authorization, installation);

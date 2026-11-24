@@ -277,7 +277,6 @@ async function readLogs(
   context: CommandContext,
 ): Promise<Result<Page, string>> {
   const authorization = context.principal.authorization;
-  if (typeof authorization !== "string") return err("logs-unavailable");
   let admin: Awaited<ReturnType<typeof authenticateAdmin>>;
   try {
     admin = await authenticateAdmin(authorization, context.installation);
@@ -286,6 +285,8 @@ async function readLogs(
   }
   if (admin.kind === "forbidden") return err("forbidden");
   if (admin.kind !== "authenticated") return err("logs-unavailable");
+  if (admin.principal.accountId !== context.principal.accountId)
+    return err("forbidden");
   let identity: { installationId: string; environment: string };
   try {
     identity = runtimeIdentity();
